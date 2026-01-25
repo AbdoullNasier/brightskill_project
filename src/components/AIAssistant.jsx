@@ -10,6 +10,7 @@ const AIAssistant = () => {
     const [isTyping, setIsTyping] = useState(false);
     const location = useLocation();
     const messagesEndRef = useRef(null);
+    const excludedRoutes = ['/login', '/register', '/ai-roleplay', '/profile/edit'];
 
     // Initial greeting based on context
     useEffect(() => {
@@ -17,6 +18,9 @@ const AIAssistant = () => {
             getContextualGreeting();
         }
     }, [isAuthenticated, isOpen, location.pathname]);
+    if (excludedRoutes.includes(location.pathname)) {
+        return null;
+    }
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -36,7 +40,7 @@ const AIAssistant = () => {
                 greeting = "This roadmap is designed specifically for your goal. Notice the focus on 'Communication' first? That's your quick-win area.";
             } else if (path.includes('/skills')) {
                 greeting = "Looking for something specific? I can recommend a module that fits your current gap analysis.";
-            } else if (path.includes('/ai-interview')) {
+            } else if (path.includes('/ai-roleplay')) {
                 greeting = "Ready for your assessment? Just be honest and relax—there are no wrong answers here.";
             }
 

@@ -7,7 +7,7 @@ export const translations = {
     'nav.howItWorks': { EN: 'How It Works', HA: 'Yadda yake aiki' },
     'nav.dashboard': { EN: 'Dashboard', HA: 'Shafin Mai Koyo' },
     'nav.learning': { EN: 'Learning Path', HA: 'Hanyar Koyo' },
-    'nav.interview': { EN: 'AI Interview', HA: 'Tattaunawar AI' },
+    'nav.roleplay': { EN: 'AI Role Play', HA: 'Tattaunawar AI' },
     'nav.profile': { EN: 'Profile', HA: 'Bayanai Na' },
     'nav.login': { EN: 'Login', HA: 'Shiga' },
     'nav.signup': { EN: 'Sign Up', HA: 'Yi Rajista' },
@@ -20,7 +20,7 @@ export const translations = {
     'auth.password_label': { EN: 'Password', HA: 'Kalmar Sirri' },
     'auth.signin_btn': { EN: 'Sign in', HA: 'Shiga' },
     'auth.signin_loading': { EN: 'Signing in...', HA: 'Ana Shiga...' },
-    'auth.google_continue': { EN: 'Continue with Google', HA: 'Ci gaba da Google' },
+
     'auth.remember_me': { EN: 'Remember me', HA: 'Tuna mini' },
     'auth.forgot_password': { EN: 'Forgot your password?', HA: 'Ka manta kalmar sirrin ka?' },
     'auth.register_title': { EN: 'Create your account', HA: 'Ƙirƙiri fagen ka' },

@@ -6,8 +6,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Skills from "./pages/Skills";
-import AIInterview from "./pages/AIInterview";
 import LearningPath from "./pages/LearningPath";
+import AIRolePlay from "./pages/AIRoleplay";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -60,11 +60,9 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/certificate" element={<Certificate />} />
-            <Route path="/ai-interview" element={<AIInterview />} />
+            <Route path="/ai-roleplay" element={<AIRolePlay />} />
             <Route path="/learning-path" element={<LearningPath />} />
             <Route path="/lesson/:id" element={<LessonView />} />
-            <Route path="/books" element={<BookRecommendations />} />
-            <Route path="/quiz/:id" element={<QuizAssessment />} />
             <Route path="/books" element={<BookRecommendations />} />
             <Route path="/quiz/:id" element={<QuizAssessment />} />
             <Route path="/profile/edit" element={<EditProfile />} />

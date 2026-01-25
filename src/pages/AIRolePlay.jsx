@@ -4,7 +4,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import { useGamification } from '../context/GamificationContext';
 
-const AIInterview = () => {
+const AIRolePlay = () => {
     const { addXp } = useGamification();
     const [messages, setMessages] = useState([
         { id: 1, sender: 'ai', text: "Hello! I'm your AI Interview Coach. I'm here to help you practice for your behavioral interview. Let's start with a classic: Tell me about a time you had a conflict with a coworker and how you resolved it." }
@@ -52,8 +52,8 @@ const AIInterview = () => {
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-64px)]flex flex-col">
             <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">AI Mock Interview</h1>
-                <p className="text-gray-600">Practice your answers in a safe environment.</p>
+                <h1 className="text-3xl font-bold text-gray-900">AI Role Play</h1>
+                <p className="text-gray-600">Interact with AI to guide you and improve your career skills.</p>
             </div>
 
             <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
@@ -131,4 +131,4 @@ const AIInterview = () => {
     );
 };
 
-export default AIInterview;
+export default AIRolePlay;

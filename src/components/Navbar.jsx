@@ -27,7 +27,7 @@ const Navbar = () => {
     const learnerLinks = [
         { name: t('nav.dashboard'), path: '/dashboard' },
         { name: t('nav.learning'), path: '/learning-path' },
-        { name: t('nav.interview'), path: '/ai-interview' },
+        { name: t('nav.roleplay'), path: '/ai-roleplay' },
         { name: t('nav.skills'), path: '/skills' }, // Shared link
     ];
 
