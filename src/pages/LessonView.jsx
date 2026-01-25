@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { MdCheckCircle, MdArrowBack, MdDeveloperMode, MdQuiz } from 'react-icons/md';
+import { MdCheckCircle, MdArrowBack, MdQuiz } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 
 const LessonView = () => {
@@ -66,21 +66,7 @@ const LessonView = () => {
                 </Button>
             </div>
 
-            {/* Dev Tool for Verification */}
-            <div className="mt-8 pt-8 border-t border-gray-200">
-                <p className="text-sm text-gray-500 mb-2">Developer Tools:</p>
-                <Button
-                    variant="outline"
-                    onClick={() => {
-                        updateCourseProgress(parseInt(id), 100);
-                        alert("Course marked as 100% complete!");
-                        navigate('/skills');
-                    }}
-                    className="flex items-center text-sm"
-                >
-                    <MdDeveloperMode className="mr-2" /> Simulate 100% Completion
-                </Button>
-            </div>
+
         </div>
     );
 };
