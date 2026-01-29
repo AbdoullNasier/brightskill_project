@@ -56,7 +56,7 @@ const Skills = () => {
             <h1 className="text-3xl font-bold text-gray-900 mb-8">{t('skills.explore')}</h1>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {skillsData.map((skill) => {
+                {skillsData.map((skill, index) => {
                     const IconComponent = Icons[skill.icon] || Icons.MdWork;
 
                     // Determine status based on Context
@@ -66,7 +66,7 @@ const Skills = () => {
                     const isLocked = isAuthenticated && activeCourseId && !isActive && !isCompleted;
 
                     return (
-                        <Card key={skill.id} className={`flex flex-col h-full hover:shadow-lg transition-shadow duration-300 ${isLocked ? 'opacity-75' : ''}`}>
+                        <Card key={skill.id} delay={index * 0.05} className={`flex flex-col h-full hover:shadow-lg transition-shadow duration-300 ${isLocked ? 'opacity-75' : ''}`}>
                             <div className="flex items-center mb-4">
                                 <div className={`p-3 rounded-full ${skill.color} mr-4`}>
                                     <IconComponent size={24} />

@@ -11,6 +11,7 @@ import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext'; // Fixed import
 import { booksData } from '../data/booksData';
+import { motion } from 'framer-motion';
 
 const Dashboard = () => {
     const { user } = useAuth(); // Import user from AuthContext
@@ -44,11 +45,17 @@ const Dashboard = () => {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <CareerAssessmentModal isOpen={showCareerModal} onClose={handleCloseModal} />
-            <h1 className="text-2xl font-bold text-gray-900 mb-8">{t('dash.welcome')}, {user?.username || user?.name}!</h1>
+            <motion.h1
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-2xl font-bold text-gray-900 mb-8"
+            >
+                {t('dash.welcome')}, {user?.username || user?.name}!
+            </motion.h1>
 
             {/* Stats Overview */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <Card className="p-4 flex items-center space-x-4">
+                <Card delay={0.1} className="p-4 flex items-center space-x-4">
                     <div className="p-3 bg-indigo-100 text-primary rounded-lg">
                         <MdTrendingUp size={24} />
                     </div>
@@ -57,7 +64,7 @@ const Dashboard = () => {
                         <p className="text-xl font-bold">5 Days</p>
                     </div>
                 </Card>
-                <Card className="p-4 flex items-center space-x-4">
+                <Card delay={0.2} className="p-4 flex items-center space-x-4">
                     <div className="p-3 bg-emerald-100 text-secondary rounded-lg">
                         <MdAccessTime size={24} />
                     </div>
@@ -66,7 +73,7 @@ const Dashboard = () => {
                         <p className="text-xl font-bold">12.5 hrs</p>
                     </div>
                 </Card>
-                <Card className="p-4 flex items-center space-x-4">
+                <Card delay={0.3} className="p-4 flex items-center space-x-4">
                     <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
                         <MdStar size={24} />
                     </div>
@@ -75,7 +82,7 @@ const Dashboard = () => {
                         <p className="text-xl font-bold">2,450</p>
                     </div>
                 </Card>
-                <Card className="p-4 flex items-center space-x-4">
+                <Card delay={0.4} className="p-4 flex items-center space-x-4">
                     <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
                         <MdBook size={24} />
                     </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
 const Button = ({ children, onClick, variant = 'primary', className = '', ...props }) => {
     const baseStyle = "px-6 py-2 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
@@ -11,13 +12,15 @@ const Button = ({ children, onClick, variant = 'primary', className = '', ...pro
     };
 
     return (
-        <button
+        <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
             onClick={onClick}
             className={`${baseStyle} ${variants[variant]} ${className}`}
             {...props}
         >
             {children}
-        </button>
+        </motion.button>
     );
 };
 

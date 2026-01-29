@@ -18,14 +18,12 @@ const AIAssistant = () => {
             getContextualGreeting();
         }
     }, [isAuthenticated, isOpen, location.pathname]);
-    if (excludedRoutes.includes(location.pathname)) {
-        return null;
-    }
-
     // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping]);
+
+
 
     const getContextualGreeting = () => {
         setIsTyping(true);
@@ -79,7 +77,7 @@ const AIAssistant = () => {
         }, 1500);
     };
 
-    if (!isAuthenticated) return null;
+    if (!isAuthenticated || excludedRoutes.includes(location.pathname)) return null;
 
     return (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none">

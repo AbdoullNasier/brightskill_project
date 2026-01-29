@@ -1,10 +1,18 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
-const Card = ({ children, className = '', hover = true }) => {
+const Card = ({ children, className = '', hover = true, delay = 0 }) => {
     return (
-        <div className={`bg-white rounded-xl p-6 border border-gray-100 ${hover ? 'hover:shadow-xl hover:-translate-y-1' : 'shadow-md'} transition-all duration-300 ${className}`}>
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.5, delay: delay }}
+            whileHover={hover ? { y: -5, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)" } : {}}
+            className={`bg-white rounded-xl p-6 border border-gray-100 shadow-md ${className}`}
+        >
             {children}
-        </div>
+        </motion.div>
     );
 };
 
