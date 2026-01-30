@@ -20,7 +20,7 @@ const Footer = () => {
                     <div>
                         <h4 className="font-semibold text-lg mb-4">Platform</h4>
                         <ul className="space-y-2 text-gray-400 text-sm">
-                            <li><a href="/learning-path" className="hover:text-primary transition-colors">Courses & Learning Path</a></li>
+                            <li><a href="/Skills" className="hover:text-primary transition-colors">Available Courses</a></li>
                             <li><a href="/community" className="hover:text-primary transition-colors">Community & Mentorship</a></li>
                             <li><a href="/ai-roleplay" className="hover:text-primary transition-colors">AI Role Play</a></li>
                         </ul>

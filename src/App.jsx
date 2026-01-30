@@ -34,9 +34,12 @@ import Forum from "./pages/Forum";
 import Certificate from "./pages/Certificate";
 
 
+import ScrollToTop from "./components/ScrollToTop";
+
 function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Routes>
         {/* Public pages without layout (Login/Register) */}
         <Route path="/login" element={<Login />} />

@@ -6,18 +6,34 @@ import { useGamification } from '../context/GamificationContext';
 
 const AIRolePlay = () => {
     const { addXp } = useGamification();
-    const [messages, setMessages] = useState([
-        { id: 1, sender: 'ai', text: "Hello! I'm your AI Interview Coach. I'm here to help you practice for your behavioral interview. Let's start with a classic: Tell me about a time you had a conflict with a coworker and how you resolved it." }
-    ]);
+    const chatContainerRef = useRef(null);
+
+    // Conversation State
+    const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const messagesEndRef = useRef(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
+    // Initial Greeting
+    useEffect(() => {
+        if (messages.length === 0) {
+            setIsTyping(true);
+            setTimeout(() => {
+                setMessages([{
+                    id: 1,
+                    sender: 'ai',
+                    text: "Hello! I'm your AI Assistant Coach. \n\nI'm here to discuss your career goals, help you understand soft skills, or answer questions about BrightSkill. What's on your mind today?"
+                }]);
+                setIsTyping(false);
+            }, 500);
+        }
+    }, [messages.length]);
 
-    useEffect(scrollToBottom, [messages]);
+    // Auto-scroll logic
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages, isTyping]);
 
     const handleSend = () => {
         if (!inputText.trim()) return;
@@ -27,38 +43,46 @@ const AIRolePlay = () => {
         setInputText('');
         setIsTyping(true);
 
-        // Mock AI response
+        // Simple Mock AI Logic
         setTimeout(() => {
-            const aiResponses = [
-                "That's a great example using the STAR method! You clearly articulated the Situation and Task.",
-                "Interesting approach. How did you ensure the other person felt heard during that conversation?",
-                "Good detail on the Action you took. What was the specific Result of your intervention?",
-                "I like how you stayed calm. Can you give me another example demonstrating your adaptability?",
-                "Excellent. Now, let's switch gears. What is your greatest professional weakness?"
-            ];
-            const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
+            const lowerInput = inputText.toLowerCase();
+            let responseText = "That's an interesting perspective. Tell me more about how that aligns with your long-term goals.";
 
-            const aiMsg = { id: messages.length + 2, sender: 'ai', text: randomResponse };
+            if (lowerInput.includes('communication') || lowerInput.includes('speak') || lowerInput.includes('listen')) {
+                responseText = "Communication is the bedrock of career success. Are you looking to improve your public speaking or your active listening skills?";
+            } else if (lowerInput.includes('leader') || lowerInput.includes('manage')) {
+                responseText = "Leadership isn't just about managing others; it's about influence. We have great modules on 'Empathy in Leadership' if you're interested.";
+            } else if (lowerInput.includes('stress') || lowerInput.includes('anural') || lowerInput.includes('confident')) {
+                responseText = "Confidence comes from preparation and mindset. Have you tried the 'Stress Management' exercises in your dashboard?";
+            } else if (lowerInput.includes('goal') || lowerInput.includes('plan')) {
+                responseText = "Setting clear goals is the first step. I can help you break down your 'Communication' goal into smaller, actionable steps.";
+            } else if (lowerInput.includes('hello') || lowerInput.includes('hi')) {
+                responseText = "Hi there! Ready to work on your professional growth today?";
+            }
+
+            const aiMsg = { id: messages.length + 2, sender: 'ai', text: responseText };
             setMessages(prev => [...prev, aiMsg]);
             setIsTyping(false);
 
-            // Award mock XP for engagement
-            if (Math.random() > 0.5) {
-                addXp(50);
-            }
-        }, 1500);
+            // Random chance for XP
+            if (Math.random() > 0.7) addXp(10);
+
+        }, 1200);
     };
 
     return (
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-64px)]flex flex-col">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-64px)] flex flex-col">
             <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">AI Role Play</h1>
-                <p className="text-gray-600">Interact with AI to guide you and improve your career skills.</p>
+                <h1 className="text-3xl font-bold text-gray-900">AI Assistant Coach</h1>
+                <p className="text-gray-600">Your personal guide for career advice and soft skill development.</p>
             </div>
 
-            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
+            <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 {/* Chat Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
+                <div
+                    ref={chatContainerRef}
+                    className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50 scroll-smooth"
+                >
                     {messages.map((msg) => (
                         <div
                             key={msg.id}
@@ -76,7 +100,7 @@ const AIRolePlay = () => {
                                 </div>
 
                                 <div
-                                    className={`p-4 rounded-2xl ${msg.sender === 'user'
+                                    className={`p-4 rounded-2xl whitespace-pre-wrap ${msg.sender === 'user'
                                         ? 'bg-primary text-white rounded-br-none'
                                         : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
                                         }`}
@@ -100,7 +124,6 @@ const AIRolePlay = () => {
                             </div>
                         </div>
                     )}
-                    <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input Area */}
@@ -114,7 +137,7 @@ const AIRolePlay = () => {
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                            placeholder="Type your answer here..."
+                            placeholder="Ask me anything..."
                             className="flex-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                         />
                         <Button
@@ -130,5 +153,6 @@ const AIRolePlay = () => {
         </div>
     );
 };
+
 
 export default AIRolePlay;
