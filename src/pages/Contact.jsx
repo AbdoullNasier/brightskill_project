@@ -15,9 +15,9 @@ const Contact = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Contact Info */}
                 <div className="md:col-span-1 space-y-6">
-                    <Card className="h-full bg-primary text-white" hover={false}>
-                        <h2 className="text-xl font-bold mb-6">Contact Information</h2>
-                        <div className="space-y-6">
+                    <Card className="h-full bg-white text-gray-800 border border-gray-200" hover={false}>
+                        <h2 className="text-xl font-bold mb-6 text-center">Contact Information</h2>
+                        <div className="flex flex-col items-start ml-4 space-y-8">
                             <div className="flex items-start">
                                 <MdEmail size={24} className="mt-1 mr-4 opacity-80" />
                                 <div>
@@ -29,14 +29,14 @@ const Contact = () => {
                                 <MdPhone size={24} className="mt-1 mr-4 opacity-80" />
                                 <div>
                                     <p className="font-semibold">Phone</p>
-                                    <p className="opacity-80">+1 (555) 123-4567</p>
+                                    <p className="opacity-80">+234 810 273 4258</p>
                                 </div>
                             </div>
                             <div className="flex items-start">
                                 <MdLocationOn size={24} className="mt-1 mr-4 opacity-80" />
                                 <div>
                                     <p className="font-semibold">Office</p>
-                                    <p className="opacity-80">123 Innovation Drive,<br />Lagos, Nigeria</p>
+                                    <p className="opacity-80">Kano State, Nigeria</p>
                                 </div>
                             </div>
                         </div>
@@ -51,7 +51,7 @@ const Contact = () => {
                                 <Input label="Name" placeholder="Your Name" />
                                 <Input label="Email" type="email" placeholder="you@example.com" />
                             </div>
-                            <Input label="Subject" placeholder="How can we help?" />
+                            <Input label="Subject" placeholder="How can we help you?" />
                             <div className="flex flex-col mb-4">
                                 <label className="mb-2 text-sm font-semibold text-gray-700">Message</label>
                                 <textarea
