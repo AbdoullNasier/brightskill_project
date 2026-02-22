@@ -10,7 +10,7 @@ from .models import (
 )
 
 REQUIRED_INTERVIEW_QUESTIONS = {
-    "career_goal": "What career goal are you trying to achieve in the next 12 months?",
+    "career_goal": "What career goal are you trying to achieve in the next 6 months?",
     "current_challenges": "What are your top soft-skill challenges right now?",
     "communication_situations": "In which situations do you struggle most with communication?",
     "confidence_level": "How would you rate your confidence in professional interactions (1-10), and why?",
@@ -22,6 +22,13 @@ REQUIRED_INTERVIEW_QUESTIONS = {
     "success_definition": "What would measurable success look like after 8 weeks?",
 }
 
+
+class FABRequestSerializer(serializers.Serializer):
+    prompt = serializers.CharField()
+    skill = serializers.CharField(required=False, allow_blank=True)
+    conversation_id = serializers.IntegerField(required=False)
+    page = serializers.CharField(required=False, default='general')
+    page_context = serializers.JSONField(required=False, default=dict)
 
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -48,7 +55,11 @@ class RolePlaySessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RolePlaySession
-        fields = ["id", "user", "started_at", "ended_at", "messages"]
+        fields = ["id", "user", "title", "started_at", "ended_at", "messages"]
+
+
+class RolePlaySessionUpdateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=140, allow_blank=False)
 
 
 class LearningPathSerializer(serializers.ModelSerializer):
@@ -91,6 +102,8 @@ class RolePlayRequestSerializer(serializers.Serializer):
     prompt = serializers.CharField(required=False, allow_blank=True)
     session_id = serializers.IntegerField(required=False)
     end_session = serializers.BooleanField(required=False, default=False)
+    scenario = serializers.CharField(required=False, allow_blank=True)
+    context = serializers.JSONField(required=False, default=dict)
 
 
 class InterviewSubmitSerializer(serializers.Serializer):

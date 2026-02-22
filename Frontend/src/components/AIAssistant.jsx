@@ -11,9 +11,20 @@ const AIAssistant = () => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [conversationId, setConversationId] = useState(null);
     const location = useLocation();
     const messagesEndRef = useRef(null);
-    const excludedRoutes = ['/login', '/register', '/ai-roleplay', '/profile/edit'];
+    const excludedRoutes = [
+        '/login',
+        '/register',
+        '/ai-roleplay',
+        '/profile/edit',
+        '/about',
+        '/privacy-policy',
+        '/terms',
+        '/terms-and-condition',
+        '/terms-and-conditions',
+    ];
     const displayName = user?.first_name || user?.username || 'there';
 
     // Initial greeting based on context
@@ -61,16 +72,16 @@ const AIAssistant = () => {
         setIsTyping(true);
 
         try {
-            const data = await postAI('/ai/chat/', {
-                message: userMsg.text,
-                context: {
-                    page: location.pathname,
-                    page_title: document.title,
-                    language: language === 'HA' ? 'hausa' : 'english',
-                },
+            const data = await postAI('/fab-assist/', {
+                prompt: userMsg.text,
+                skill: language === 'HA' ? 'hausa soft skills' : 'soft skills',
+                ...(conversationId ? { conversation_id: conversationId } : {}),
             });
 
             setMessages(prev => [...prev, { sender: 'ai', text: data.reply, time: new Date() }]);
+            if (data.conversation_id) {
+                setConversationId(data.conversation_id);
+            }
             setIsTyping(false);
         } catch (err) {
             setMessages(prev => [...prev, {

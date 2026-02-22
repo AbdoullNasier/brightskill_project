@@ -1,8 +1,13 @@
 import re
+import hashlib
+import json
 
+from django.core.cache import cache
+from .prompt_builder import build_system_prompt, AIContext
 from decouple import config
 from google import genai
 from google.genai import types
+from google.genai.errors import ClientError
 
 
 SOFT_SKILLS_TOPICS = {
@@ -35,6 +40,82 @@ OFF_TOPIC_HINTS = {
 
 _client = None
 
+
+def _build_generation_config(temperature=0.4, max_output_tokens=None):
+    kwargs = {"temperature": temperature}
+    if max_output_tokens is not None:
+        kwargs["max_output_tokens"] = max_output_tokens
+    # Keep thinking budget off for faster responses and to avoid token budget
+    # being consumed by internal reasoning before user-visible output.
+    kwargs["thinking_config"] = types.ThinkingConfig(
+        thinking_budget=config("GEMINI_THINKING_BUDGET", default=0, cast=int)
+    )
+    return types.GenerateContentConfig(**kwargs)
+
+# cache and context-aware function
+
+def _cache_key(context: AIContext, user_id: int, query: str, page_data: dict) -> str:
+    """Generate a unique cache key for a query."""
+    data_str = json.dumps(page_data, sort_keys=True)
+    unique = f"{context.value}:{user_id}:{query}:{data_str}"
+    return hashlib.md5(unique.encode()).hexdigest()
+
+def ask_gemini_with_context(
+    query: str,
+    context: AIContext,
+    page_data: dict,
+    user_id: int,
+    max_tokens: int = 200,
+    temperature: float = 0.3,
+    use_cache: bool = True
+) -> str:
+    """Context-aware AI call with caching."""
+    cache_key = _cache_key(context, user_id, query, page_data) if use_cache else None
+    if use_cache:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+    system = build_system_prompt(context, page_data)
+    full_prompt = f"{system}\n\nUser: {query}\nAI:"
+    
+    result = ask_gemini(full_prompt, max_output_tokens=max_tokens, temperature=temperature)
+    
+    if use_cache and result and not result.startswith("I could not reach"):
+        cache.set(cache_key, result, timeout=3600)  # 1 hour cache
+    return result
+
+def stream_gemini_with_context(
+    query: str,
+    context: AIContext,
+    page_data: dict,
+    user_id: int,
+    max_tokens: int = 200,
+    temperature: float = 0.3
+):
+    """Stream the response chunk by chunk."""
+    system = build_system_prompt(context, page_data)
+    full_prompt = f"{system}\n\nUser: {query}\nAI:"
+    
+    client = _get_client()
+    if not client:
+        yield "AI service not configured."
+        return
+
+    try:
+        response = client.models.generate_content_stream(
+            model=config("GEMINI_MODEL", default="gemini-3-flash-preview"),
+            contents=full_prompt,
+            config=_build_generation_config(
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+            ),
+        )
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+    except Exception as e:
+        yield f"Error: {str(e)}"
 
 def is_off_topic(user_prompt):
     normalized = re.sub(r"\s+", " ", user_prompt.lower()).strip()
@@ -71,9 +152,9 @@ def ask_gemini(prompt, max_output_tokens=180, temperature=0.4, timeout_seconds=1
 
     try:
         response = client.models.generate_content(
-            model=config("GEMINI_MODEL", default="gemini-2.0-flash"),
+            model=config("GEMINI_MODEL", default="gemini-3-flash-preview"),
             contents=prompt,
-            config=types.GenerateContentConfig(
+            config=_build_generation_config(
                 temperature=temperature,
                 max_output_tokens=max_output_tokens,
             ),
@@ -82,5 +163,15 @@ def ask_gemini(prompt, max_output_tokens=180, temperature=0.4, timeout_seconds=1
             getattr(response, "text", "")
             or "I can help you improve communication, leadership, and other soft skills."
         ).strip()
+    except ClientError as exc:
+        status_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+        message = str(exc).lower()
+        if status_code == 404 or "not found" in message:
+            return "AI model configuration error. Please contact support."
+        if status_code == 429 or "quota" in message or "resource_exhausted" in message:
+            return "AI usage limit reached for this project. Please check Gemini billing/quota and try again."
+        if status_code == 401 or status_code == 403 or "permission" in message:
+            return "AI service authentication failed. Please verify the Gemini API key."
+        return "I could not reach the AI service right now. Please try again in a moment."
     except Exception:
         return "I could not reach the AI service right now. Please try again in a moment."

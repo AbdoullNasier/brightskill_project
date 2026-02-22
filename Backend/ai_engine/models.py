@@ -27,6 +27,7 @@ class Message(models.Model):
 
 class RolePlaySession(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="roleplay_sessions", on_delete=models.CASCADE)
+    title = models.CharField(max_length=140, blank=True, default="")
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(blank=True, null=True)
 

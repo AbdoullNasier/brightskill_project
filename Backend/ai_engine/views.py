@@ -1,8 +1,14 @@
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from decouple import config
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+
+import json
+from .prompt_builder import AIContext
+from .services import ask_gemini_with_context, stream_gemini_with_context
+from django.http import StreamingHttpResponse
 
 from books.services import create_book_recommendation
 from .models import (
@@ -18,6 +24,7 @@ from .serializers import (
     FABRequestSerializer,
     RolePlayRequestSerializer,
     RolePlaySessionSerializer,
+    RolePlaySessionUpdateSerializer,
     InterviewSubmitSerializer,
     InterviewAssessmentSerializer,
     LearningPathSerializer,
@@ -78,7 +85,17 @@ class FABAssistView(generics.GenericAPIView):
         prompt = serializer.validated_data["prompt"]
         skill = serializer.validated_data.get("skill") or "soft skills"
         conversation_id = serializer.validated_data.get("conversation_id")
+        page = serializer.validated_data.get("page", "general")
+        page_context = serializer.validated_data.get("page_context", {})
+        stream = request.query_params.get('stream', 'false').lower() == 'true'
 
+        # Map page string to AIContext enum
+        try:
+            ai_context = AIContext(page)
+        except ValueError:
+            ai_context = AIContext.GENERAL
+
+        # Get or create conversation
         if conversation_id:
             conversation = Conversation.objects.filter(id=conversation_id, user=request.user).first()
         else:
@@ -87,10 +104,39 @@ class FABAssistView(generics.GenericAPIView):
         if not conversation:
             conversation = Conversation.objects.create(user=request.user, skill=skill)
 
+        # Save user message
         Message.objects.create(conversation=conversation, sender=Message.Sender.USER, content=prompt)
-        reply = ask_gemini(preprocess_user_prompt(prompt), max_output_tokens=160, temperature=0.3)
+
+        # Handle streaming vs normal
+        if stream:
+            def event_stream():
+                for chunk in stream_gemini_with_context(
+                    query=prompt,
+                    context=ai_context,
+                    page_data=page_context,
+                    user_id=request.user.id,
+                    max_tokens=220,
+                    temperature=0.3
+                ):
+                    yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+            response['Cache-Control'] = 'no-cache'
+            return response
+        else:
+            reply = ask_gemini_with_context(
+                query=prompt,
+                context=ai_context,
+                page_data=page_context,
+                user_id=request.user.id,
+                max_tokens=220,
+                temperature=0.3,
+                use_cache=True
+            )
+
+        # Save AI reply
         Message.objects.create(conversation=conversation, sender=Message.Sender.AI, content=reply)
 
+        # Book recommendation logic
         recommendation = None
         if INLINE_BOOK_RECOMMENDATIONS and conversation.messages.filter(sender=Message.Sender.USER).count() >= 3:
             recommendation = create_book_recommendation(
@@ -121,38 +167,70 @@ class RolePlayView(generics.GenericAPIView):
         prompt = serializer.validated_data.get("prompt", "")
         end_session = serializer.validated_data.get("end_session", False)
         session_id = serializer.validated_data.get("session_id")
+        scenario = serializer.validated_data.get("scenario", "")
+        extra_context = serializer.validated_data.get("context", {})
 
+        # Get or create session
         if session_id:
             session = RolePlaySession.objects.filter(id=session_id, user=request.user).first()
         else:
             session = None
         if not session:
             session = RolePlaySession.objects.create(user=request.user)
+            if scenario:
+                session.title = scenario[:140]  # use scenario as title
+                session.save(update_fields=["title"])
 
+        # If ending session, just mark ended and return
+        if end_session:
+            session.ended_at = timezone.now()
+            session.save(update_fields=["ended_at"])
+            return Response({"reply": "Session ended.", "session_id": session.id, "ended_at": session.ended_at})
+
+        # Save user message
         if prompt:
             RolePlayMessage.objects.create(session=session, role=RolePlayMessage.Role.USER, content=prompt)
-            roleplay_prompt = (
-                "You are a role-play coach focused on soft skills and personal development only. "
-                "Provide practical, concise feedback and ask one follow-up question. "
-                f"User message: {prompt}"
+
+            # Build context for AI
+            # Gather recent messages (last 5) for continuity
+            recent_msgs = session.messages.order_by('timestamp')[:5]
+            # actually we want last 5, but order_by timestamp ascending gives oldest first? Need to get recent.
+            # Better: get last 5 messages in chronological order
+            recent = session.messages.order_by('-timestamp')[:5]  # get newest 5, then reverse for prompt
+            history = "\n".join([f"{m.role}: {m.content}" for m in reversed(recent)])  # chronological
+
+            page_data = {
+                "scenario": scenario or session.title,
+                "recent_history": history,
+                **extra_context
+            }
+
+            # Use context-aware function with AIContext.ROLEPLAY
+            reply = ask_gemini_with_context(
+                query=prompt,
+                context=AIContext.ROLEPLAY,
+                page_data=page_data,
+                user_id=request.user.id,
+                max_tokens=180,
+                temperature=0.35,
+                use_cache=True  # optional, but may help for repeated lines
             )
-            reply = ask_gemini(roleplay_prompt, max_output_tokens=140, temperature=0.35)
+
+            # Save AI reply
             RolePlayMessage.objects.create(session=session, role=RolePlayMessage.Role.AI, content=reply)
         else:
-            reply = "Share a workplace soft-skill scenario and I will role-play it with you."
+            # Initial message, no prompt yet – just welcome
+            reply = "Share a workplace soft‑skill scenario and I will role‑play it with you."
 
+        # Optional book recommendation (unchanged)
         recommendation = None
         if INLINE_BOOK_RECOMMENDATIONS and session.messages.filter(role=RolePlayMessage.Role.USER).count() >= 3:
             recommendation = create_book_recommendation(
                 user=request.user,
-                topic="role-play communication and leadership",
+                topic="role‑play communication and leadership",
                 source_type="conversation",
                 source_id=session.id,
             )
-
-        if end_session:
-            session.ended_at = timezone.now()
-            session.save(update_fields=["ended_at"])
 
         payload = {"reply": reply, "session_id": session.id, "ended_at": session.ended_at}
         if recommendation:
@@ -169,7 +247,34 @@ class RolePlayHistoryView(generics.ListAPIView):
     serializer_class = RolePlaySessionSerializer
 
     def get_queryset(self):
-        return RolePlaySession.objects.filter(user=self.request.user).prefetch_related("messages")
+        queryset = RolePlaySession.objects.filter(user=self.request.user).prefetch_related("messages")
+        query = (self.request.query_params.get("q") or "").strip()
+        if query:
+            queryset = queryset.filter(Q(title__icontains=query) | Q(messages__content__icontains=query)).distinct()
+        return queryset
+
+
+class RolePlaySessionManageView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RolePlaySessionUpdateSerializer
+
+    def patch(self, request, session_id):
+        session = RolePlaySession.objects.filter(id=session_id, user=request.user).first()
+        if not session:
+            return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        session.title = serializer.validated_data["title"].strip()
+        session.save(update_fields=["title"])
+        return Response({"id": session.id, "title": session.title}, status=status.HTTP_200_OK)
+
+    def delete(self, request, session_id):
+        session = RolePlaySession.objects.filter(id=session_id, user=request.user).first()
+        if not session:
+            return Response({"detail": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+        session.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class InterviewQuestionsView(generics.GenericAPIView):

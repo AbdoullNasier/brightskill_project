@@ -88,3 +88,7 @@ const requestAI = async (method, path, payload) => {
 export const postAI = async (path, payload) => requestAI('POST', path, payload);
 
 export const getAI = async (path) => requestAI('GET', path);
+
+export const patchAI = async (path, payload) => requestAI('PATCH', path, payload);
+
+export const deleteAI = async (path) => requestAI('DELETE', path);
