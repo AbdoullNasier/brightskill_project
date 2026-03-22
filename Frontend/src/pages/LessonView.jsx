@@ -1,60 +1,231 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { MdArrowBack, MdQuiz } from 'react-icons/md';
+import { MdArrowBack, MdQuiz, MdCheckCircle } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
+import QuizModal from '../components/QuizModal';
+import { getCourseModules, getQuizzes } from '../services/courseService';
+
+const LESSON_CONTEXT_STORAGE_KEY = 'brightskill_lesson_context';
 
 const LessonView = () => {
     const { id } = useParams();
+    const location = useLocation();
     const navigate = useNavigate();
     const courseId = Number(id);
-    const { apiRequest, updateCourseProgress } = useAuth();
+    const { apiRequest, refreshProgress } = useAuth();
 
     const [course, setCourse] = useState(null);
     const [moduleItem, setModuleItem] = useState(null);
+    const [modules, setModules] = useState([]);
+    const [quizzes, setQuizzes] = useState([]);
+
+    // Quiz state
+    const [quizModalOpen, setQuizModalOpen] = useState(false);
+    const [activeQuiz, setActiveQuiz] = useState(null);
+    const [resultMsg, setResultMsg] = useState(null);
+    const [resultDetail, setResultDetail] = useState(null);
+
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!course || !moduleItem) return;
+
+        const lessonContext = {
+            course_id: courseId,
+            course_title: course?.title || '',
+            module_id: moduleItem?.id || null,
+            module_title: moduleItem?.title || '',
+            module_order: moduleItem?.order_index || null,
+            module_description: moduleItem?.description || '',
+            module_content: (moduleItem?.content || moduleItem?.description || '').slice(0, 2500),
+            has_video: Boolean(moduleItem?.youtube_url),
+            video_url: moduleItem?.youtube_url || '',
+        };
+
+        sessionStorage.setItem(LESSON_CONTEXT_STORAGE_KEY, JSON.stringify(lessonContext));
+        window.dispatchEvent(new CustomEvent('brightskill-lesson-context', { detail: lessonContext }));
+    }, [course, moduleItem, courseId]);
+
+    useEffect(() => {
+        if (!course || !moduleItem) return;
+
+        if (quizModalOpen && activeQuiz) {
+            const quizContext = {
+                mode: 'quiz',
+                current_path: location.pathname,
+                course_id: courseId,
+                course_title: course?.title || '',
+                module_id: moduleItem?.id || null,
+                module_title: moduleItem?.title || '',
+                selected_skill: course?.skill_name || '',
+                quiz_id: activeQuiz.id,
+                quiz_title: activeQuiz.title || '',
+                quiz_type: activeQuiz.quiz_type || 'module',
+                pass_score: activeQuiz.pass_score || 70,
+                question_count: Array.isArray(activeQuiz.questions) ? activeQuiz.questions.length : 0,
+                hint_mode: true,
+                instruction: 'Give hints and explanations only. Do not provide direct answers.',
+            };
+            sessionStorage.setItem(LESSON_CONTEXT_STORAGE_KEY, JSON.stringify(quizContext));
+            window.dispatchEvent(new CustomEvent('brightskill-lesson-context', { detail: quizContext }));
+            return;
+        }
+
+        const lessonContext = {
+            mode: 'lesson',
+            current_path: location.pathname,
+            course_id: courseId,
+            course_title: course?.title || '',
+            module_id: moduleItem?.id || null,
+            module_title: moduleItem?.title || '',
+            module_order: moduleItem?.order_index || null,
+            module_description: moduleItem?.description || '',
+            module_content: (moduleItem?.content || moduleItem?.description || '').slice(0, 2500),
+            has_video: Boolean(moduleItem?.youtube_url),
+            video_url: moduleItem?.youtube_url || '',
+        };
+        sessionStorage.setItem(LESSON_CONTEXT_STORAGE_KEY, JSON.stringify(lessonContext));
+        window.dispatchEvent(new CustomEvent('brightskill-lesson-context', { detail: lessonContext }));
+    }, [quizModalOpen, activeQuiz, course, moduleItem, courseId, location.pathname]);
 
     useEffect(() => {
         const loadLesson = async () => {
             try {
-                const [courseRes, moduleRes] = await Promise.all([
+                const [courseRes, moduleRes, quizRes] = await Promise.all([
                     apiRequest(`/courses/${courseId}/`),
-                    apiRequest(`/courses/${courseId}/modules/`),
+                    getCourseModules(courseId),
+                    getQuizzes({ course: courseId }),
                 ]);
 
                 if (courseRes.ok) {
                     setCourse(await courseRes.json());
                 }
 
-                if (moduleRes.ok) {
-                    const modules = await moduleRes.json();
-                    if (Array.isArray(modules) && modules.length > 0) {
-                        setModuleItem(modules[0]);
-                    }
+                if (Array.isArray(moduleRes) && moduleRes.length > 0) {
+                    setModules(moduleRes);
+                    const preferredModule = location.state?.focusFinalExam
+                        ? moduleRes[moduleRes.length - 1]
+                        : moduleRes[0];
+                    setModuleItem(preferredModule);
                 }
+
+                if (Array.isArray(quizRes)) {
+                    setQuizzes(quizRes);
+                }
+            } catch (e) {
+                console.error("Failed to load lesson data", e);
             } finally {
                 setLoading(false);
             }
         };
 
         loadLesson();
-    }, [courseId]);
+    }, [courseId, apiRequest, location.state]);
 
-    const handleTakeQuiz = async () => {
-        // Keep existing progress behavior tied to lessons if present in course setup.
+    const handleTakeQuiz = (type) => {
+        // Find relevant quiz based on type (module or exam)
+        let relevantQuiz = null;
+        if (type === 'module' && moduleItem) {
+            relevantQuiz = quizzes.find(q => q.quiz_type === 'module' && q.module === moduleItem.id);
+        } else if (type === 'exam') {
+            relevantQuiz = quizzes.find(q => q.quiz_type === 'exam');
+        }
+
+        if (relevantQuiz) {
+            setActiveQuiz(relevantQuiz);
+            setQuizModalOpen(true);
+        } else {
+            setActiveQuiz(null);
+            if (type === 'exam') {
+                setResultMsg('No final exam is configured for this course yet.');
+                setResultDetail(null);
+                return;
+            }
+            handleQuizSubmit(100);
+        }
+    };
+
+    const handleQuizSubmit = async (score) => {
         try {
-            const legacyLessonRes = await apiRequest(`/courses/lessons/?course=${courseId}`);
-            if (legacyLessonRes.ok) {
-                const legacyLessons = await legacyLessonRes.json();
-                if (Array.isArray(legacyLessons) && legacyLessons.length > 0) {
-                    await updateCourseProgress(courseId, legacyLessons[0].id);
+            let attemptData = null;
+            if (activeQuiz) {
+                const attemptResponse = await apiRequest('/progress/quiz-attempts/submit/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        quiz_id: activeQuiz.id,
+                        score: score
+                    })
+                });
+                if (!attemptResponse.ok) {
+                    throw new Error('Failed to submit quiz.');
+                }
+                attemptData = await attemptResponse.json();
+            }
+
+            const failedQuiz = activeQuiz && attemptData && attemptData.passed === false;
+            if (failedQuiz) {
+                setQuizModalOpen(false);
+                setResultMsg('Quiz not passed yet.');
+                setResultDetail(`You scored ${attemptData.score}%. Required: ${activeQuiz.pass_score}%.`);
+                return;
+            }
+
+            // Mark module complete
+            if (activeQuiz?.quiz_type !== 'exam' && moduleItem) {
+                const completionResponse = await apiRequest('/progress/complete-module/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ course_id: courseId, module_id: moduleItem.id })
+                });
+                if (!completionResponse.ok) {
+                    throw new Error('Failed to update module completion.');
+                }
+                await refreshProgress();
+            }
+
+            setQuizModalOpen(false);
+            if (activeQuiz?.quiz_type === 'exam') {
+                const passed = Boolean(attemptData?.passed);
+                const scoreText = attemptData?.score != null ? `Score: ${attemptData.score}%` : '';
+                setResultMsg(passed ? 'Final exam passed. Course completed.' : 'Final exam submitted.');
+                setResultDetail(
+                    [
+                        scoreText,
+                        attemptData?.book_recommendation
+                            ? `AI Suggestion: ${attemptData.book_recommendation.title} by ${attemptData.book_recommendation.author}. ${attemptData.book_recommendation.reason}`
+                            : null,
+                    ].filter(Boolean).join(' ')
+                );
+                setTimeout(() => {
+                    if (passed && attemptData?.certificate) {
+                        navigate(`/certificate/${courseId}`);
+                        return;
+                    }
+                    refreshProgress();
+                    navigate('/dashboard');
+                }, 2000);
+            } else {
+                setResultMsg('Module completed.');
+                setResultDetail(attemptData?.score != null ? `Quiz score: ${attemptData.score}%` : null);
+                const currentIndex = modules.findIndex((m) => m.id === moduleItem?.id);
+                const nextModule = currentIndex >= 0 ? modules[currentIndex + 1] : null;
+                if (nextModule) {
+                    setTimeout(() => {
+                        setModuleItem(nextModule);
+                        setResultMsg(null);
+                        setResultDetail(null);
+                    }, 1400);
                 }
             }
+
         } catch (error) {
             console.error(error);
+            alert("Failed to record completion. Please try again.");
+            setQuizModalOpen(false);
         }
-        navigate(`/quiz/${courseId}`);
     };
 
     if (loading) {
@@ -73,6 +244,30 @@ const LessonView = () => {
 
             <Card className="p-0 overflow-hidden mb-6">
                 <div className="p-8">
+                    <div className="mb-6">
+                        <p className="text-sm font-semibold text-gray-700 mb-2">Course Modules</p>
+                        <div className="flex flex-wrap gap-2">
+                            {modules.map((m) => (
+                                <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => {
+                                        setModuleItem(m);
+                                        setResultMsg(null);
+                                        setResultDetail(null);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-full text-xs border ${
+                                        moduleItem?.id === m.id
+                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    {m.order_index}. {m.title}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <h1 className="text-3xl font-bold text-gray-900 mb-4">{moduleItem.title}</h1>
                     <p className="text-gray-600 mb-2">Course: {course?.title}</p>
                     <p className="text-gray-600 mb-6">Module order: {moduleItem.order_index}</p>
@@ -108,11 +303,40 @@ const LessonView = () => {
                 </div>
             </Card>
 
-            <div className="flex justify-end">
-                <Button onClick={handleTakeQuiz} className="flex items-center text-lg px-8 py-3">
-                    <MdQuiz className="mr-2" /> Mark Lesson Complete & Take Quiz
-                </Button>
-            </div>
+            {resultMsg ? (
+                <div className="flex flex-col items-center justify-center p-8 bg-green-50 rounded-xl border border-green-200">
+                    <MdCheckCircle className="text-5xl text-green-500 mb-4" />
+                    <h2 className="text-2xl font-bold text-green-800">{resultMsg}</h2>
+                    {resultDetail && <p className="text-sm text-green-900 mt-3 text-center">{resultDetail}</p>}
+                </div>
+            ) : (
+                <div className="flex justify-between items-center bg-gray-50 p-6 rounded-xl border">
+                    <div>
+                        <h3 className="font-semibold text-gray-800">Ready to move on?</h3>
+                        <p className="text-sm text-gray-600">Complete the quiz to record your progress.</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <Button onClick={() => handleTakeQuiz('module')} className="flex items-center px-6">
+                            <MdQuiz className="mr-2" /> Take Module Quiz
+                        </Button>
+                        {modules[modules.length - 1]?.id === moduleItem.id && (
+                            <Button onClick={() => handleTakeQuiz('exam')} variant="outline" className="flex items-center px-6 border-indigo-600 text-indigo-600 hover:bg-indigo-50">
+                                <MdQuiz className="mr-2" /> Take Final Exam
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <QuizModal
+                isOpen={quizModalOpen}
+                onClose={() => setQuizModalOpen(false)}
+                quizTitle={activeQuiz?.title || 'Knowledge Check'}
+                quizType={activeQuiz?.quiz_type || 'module'}
+                passScore={activeQuiz?.pass_score || 70}
+                questions={activeQuiz?.questions || []}
+                onSubmit={handleQuizSubmit}
+            />
         </div>
     );
 };

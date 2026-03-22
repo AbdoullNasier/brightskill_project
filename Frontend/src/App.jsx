@@ -30,6 +30,7 @@ import TutorApplications from "./pages/admin/TutorApplications";
 import Analytics from "./pages/admin/Analytics";
 import TutorDashboard from "./pages/admin/TutorDashboard";
 import UserManagement from "./pages/admin/UserManagement";
+import AdminProfile from "./pages/admin/AdminProfile";
 
 import EditProfile from "./pages/EditProfile";
 import Badges from "./pages/Badges";
@@ -64,9 +65,9 @@ function App() {
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={["learner", "admin", "tutor"]} />}>
-          <Route element={<MainLayout />}>
+            <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/certificate" element={<Certificate />} />
+            <Route path="/certificate/:courseId?" element={<Certificate />} />
             <Route path="/ai-roleplay" element={<AIRolePlay />} />
             <Route path="/learning-path" element={<LearningPath />} />
             <Route path="/lesson/:id" element={<LessonView />} />
@@ -78,20 +79,22 @@ function App() {
           </Route>
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["admin", "super_admin"]} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/analytics" element={<Analytics />} />
             <Route path="/admin/tutor-applications" element={<TutorApplications />} />
+            <Route path="/admin/profile" element={<AdminProfile />} />
           </Route>
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={["admin", "tutor"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["admin", "super_admin", "tutor"]} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/content" element={<ContentManagement />} />
             <Route path="/admin/courses/new" element={<CourseCreate />} />
             <Route path="/admin/courses/:id" element={<CourseDetail />} />
+            <Route path="/admin/profile" element={<AdminProfile />} />
           </Route>
         </Route>
 

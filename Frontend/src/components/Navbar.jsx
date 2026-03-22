@@ -44,7 +44,7 @@ const Navbar = () => {
     let navLinks = [];
     if (!isAuthenticated) {
         navLinks = publicLinks;
-    } else if (['admin'].includes(user?.role)) {
+    } else if (user?.role === 'admin') {
         navLinks = adminLinks;
     } else if (user?.role === 'tutor') {
         navLinks = tutorLinks;
@@ -59,7 +59,7 @@ const Navbar = () => {
             return (
                 <div className="flex items-center space-x-4">
                     <Link to="/login">
-                        <Button variant="gost" className="!px-4">{t('nav.login')}</Button>
+                        <Button variant="ghost" className="!px-4">{t('nav.login')}</Button>
                     </Link>
                     <Link to="/register">
                         <Button className="!px-4 text-sm">{t('nav.signup')}</Button>
@@ -92,7 +92,7 @@ const Navbar = () => {
                     <Link
                         to={
                             isAuthenticated
-                                ? (['admin', 'super_admin'].includes(user?.role)
+                                ? (user?.role === 'admin'
                                     ? '/admin/dashboard'
                                     : user?.role === 'tutor'
                                         ? '/admin/tutor-dashboard'

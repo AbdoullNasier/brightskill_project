@@ -1,5 +1,6 @@
 import logging
 import threading
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -8,6 +9,7 @@ from django.core.mail import send_mail
 from django.db import IntegrityError
 from django.db.models import Q, Count
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.html import strip_tags
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
@@ -19,7 +21,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from core.permissions import IsPlatformAdmin
 from courses.models import Course
-from progress.models import Progress, Enrollment, LessonCompletion
+from progress.models import Progress, Enrollment, ModuleCompletion
 from certificates.models import Certificate
 from ai_engine.models import LearningPath
 from .models import TutorApplication
@@ -29,10 +31,12 @@ from .serializers import (
     CustomTokenObtainPairSerializer,
     AdminUserSerializer,
     AdminUserUpdateSerializer,
+    ProfileSettingsSerializer,
     TutorApplicationSerializer,
     TutorApplicationAdminSerializer,
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
+    ChangePasswordSerializer,
 )
 
 User = get_user_model()
@@ -51,6 +55,67 @@ def _send_notification_email(subject, html_body, recipient):
     )
 
 
+def _build_user_badges(xp, completed_courses, modules_completed, certificates_count, has_learning_path):
+    badges = []
+
+    if modules_completed >= 1:
+        badges.append(
+            {
+                "id": "first-module",
+                "name": "First Step",
+                "icon": "MdPlayCircle",
+                "description": "Completed your first learning module.",
+            }
+        )
+    if modules_completed >= 5:
+        badges.append(
+            {
+                "id": "module-marathon",
+                "name": "Consistent Learner",
+                "icon": "MdAutoGraph",
+                "description": "Completed 5 or more modules.",
+            }
+        )
+    if completed_courses >= 1:
+        badges.append(
+            {
+                "id": "course-finisher",
+                "name": "Course Finisher",
+                "icon": "MdSchool",
+                "description": "Completed at least one full course.",
+            }
+        )
+    if certificates_count >= 1:
+        badges.append(
+            {
+                "id": "certified",
+                "name": "Certified Learner",
+                "icon": "MdWorkspacePremium",
+                "description": "Earned your first certificate.",
+            }
+        )
+    if xp >= 1000:
+        badges.append(
+            {
+                "id": "xp-1000",
+                "name": "Level Up",
+                "icon": "MdTrendingUp",
+                "description": "Reached 1000 XP.",
+            }
+        )
+    if has_learning_path:
+        badges.append(
+            {
+                "id": "pathfinder",
+                "name": "Pathfinder",
+                "icon": "MdPsychology",
+                "description": "Completed interview and generated a learning path.",
+            }
+        )
+
+    return badges
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (permissions.AllowAny,)
@@ -61,18 +126,21 @@ class RegisterView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        try:
-            _send_notification_email(
-                subject="Welcome to BrightSkill",
-                html_body=(
-                    f"<p>Hi {user.first_name or user.username},</p>"
-                    "<p>Thank you for registering on BrightSkill.</p>"
-                    "<p>You can now log in and start your learning journey.</p>"
-                ),
-                recipient=user.email,
-            )
-        except Exception:
-            logger.exception("Welcome email failed for user_id=%s", user.id)
+        def _send_welcome_email_async():
+            try:
+                _send_notification_email(
+                    subject="Welcome to BrightSkill",
+                    html_body=(
+                        f"<p>Hi {user.first_name or user.username},</p>"
+                        "<p>Thank you for registering on BrightSkill.</p>"
+                        "<p>You can now log in and start your learning journey.</p>"
+                    ),
+                    recipient=user.email,
+                )
+            except Exception:
+                logger.exception("Welcome email failed for user_id=%s", user.id)
+
+        threading.Thread(target=_send_welcome_email_async, daemon=True).start()
 
         refresh = RefreshToken.for_user(user)
         return Response(
@@ -97,6 +165,33 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class ProfileSettingsView(generics.RetrieveUpdateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = ProfileSettingsSerializer
+
+    def get_object(self):
+        return User.objects.prefetch_related("tutor_applications").get(pk=self.request.user.pk)
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = ChangePasswordSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        if not user.check_password(serializer.validated_data["current_password"]):
+            raise ValidationError({"current_password": "Current password is incorrect."})
+
+        user.set_password(serializer.validated_data["new_password"])
+        user.save(update_fields=["password"])
+
+        return Response({"message": "Password updated successfully."}, status=status.HTTP_200_OK)
 
 
 class TutorApplicationCreateView(generics.CreateAPIView):
@@ -280,8 +375,9 @@ class AdminDashboardStatsView(generics.GenericAPIView):
     def get(self, request):
         total_users = User.objects.count()
         active_learners = User.objects.filter(role=User.Roles.LEARNER, is_active=True).count()
-        total_courses = Course.objects.count()
-        completed_courses = Progress.objects.filter(completion_percentage=100).count()
+        active_courses_qs = Course.objects.filter(is_active=True)
+        total_courses = active_courses_qs.count()
+        completed_courses = Progress.objects.filter(course__is_active=True, completion_percentage=100).count()
 
         completion_rate = 0
         if total_users > 0 and total_courses > 0:
@@ -289,7 +385,7 @@ class AdminDashboardStatsView(generics.GenericAPIView):
 
         recent_signups = User.objects.order_by("-date_joined")[:5]
         popular_courses = (
-            Course.objects.annotate(total_enrollments=Count("enrollments"))
+            active_courses_qs.annotate(total_enrollments=Count("enrollments"))
             .order_by("-total_enrollments", "title")[:5]
         )
 
@@ -299,7 +395,7 @@ class AdminDashboardStatsView(generics.GenericAPIView):
                 "active_learners": active_learners,
                 "total_courses": total_courses,
                 "completion_rate": completion_rate,
-                "lessons_completed": LessonCompletion.objects.count(),
+                "lessons_completed": ModuleCompletion.objects.count(),
                 "certificates_issued": Certificate.objects.count(),
                 "enrollments": Enrollment.objects.count(),
                 "recent_signups": AdminUserSerializer(recent_signups, many=True).data,
@@ -355,13 +451,21 @@ class UserDashboardView(generics.GenericAPIView):
         user = request.user
         progress_qs = Progress.objects.filter(user=user).select_related("course")
         completed_courses = progress_qs.filter(completion_percentage=100).count()
-        total_lessons_completed = LessonCompletion.objects.filter(user=user).count()
+        total_lessons_completed = ModuleCompletion.objects.filter(user=user).count()
         certificates_count = Certificate.objects.filter(user=user).count()
         enrollments_count = Enrollment.objects.filter(user=user).count()
         latest_path = LearningPath.objects.filter(user=user).order_by("-generated_at").first()
+        has_learning_path = latest_path is not None
 
         xp = (completed_courses * 500) + (total_lessons_completed * 50) + (certificates_count * 200)
         level = max(1, (xp // 1000) + 1)
+        badges = _build_user_badges(
+            xp=xp,
+            completed_courses=completed_courses,
+            modules_completed=total_lessons_completed,
+            certificates_count=certificates_count,
+            has_learning_path=has_learning_path,
+        )
 
         active_progress = progress_qs.exclude(completion_percentage=100).order_by("-last_updated").first()
         continue_learning = None
@@ -384,7 +488,8 @@ class UserDashboardView(generics.GenericAPIView):
                     "lessons_completed": total_lessons_completed,
                 },
                 "continue_learning": continue_learning,
-                "has_learning_path": latest_path is not None,
+                "has_learning_path": has_learning_path,
+                "badges": badges,
             }
         )
 
@@ -393,13 +498,30 @@ class LeaderboardView(generics.GenericAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
+        now = timezone.now()
+        week_start = (now - timedelta(days=now.weekday())).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
         users = User.objects.filter(is_active=True).order_by("id")
         rows = []
         for user in users:
-            completed_courses = Progress.objects.filter(user=user, completion_percentage=100).count()
-            lessons_completed = LessonCompletion.objects.filter(user=user).count()
-            certificates_count = Certificate.objects.filter(user=user).count()
-            xp = (completed_courses * 500) + (lessons_completed * 50) + (certificates_count * 200)
+            completed_courses = Progress.objects.filter(
+                user=user,
+                completion_percentage=100,
+                last_updated__gte=week_start,
+            ).count()
+            modules_completed = ModuleCompletion.objects.filter(
+                user=user,
+                completed_at__gte=week_start,
+            ).count()
+            certificates_count = Certificate.objects.filter(
+                user=user,
+                issued_at__gte=week_start,
+            ).count()
+            xp = (completed_courses * 500) + (modules_completed * 50) + (certificates_count * 200)
             rows.append(
                 {
                     "user_id": user.id,
@@ -414,5 +536,4 @@ class LeaderboardView(generics.GenericAPIView):
         for index, row in enumerate(rows, start=1):
             row["rank"] = index
 
-        return Response(rows[:10])
-
+        return Response(rows[:6])

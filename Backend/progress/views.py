@@ -3,17 +3,21 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from .models import Enrollment, Progress, Quiz, QuizAttempt
+
+# permission helpers imported from courses.permissions so we can reuse them
+from courses.permissions import is_admin, is_tutor, is_student
 from .serializers import (
     EnrollmentSerializer,
     ProgressSerializer,
     QuizSerializer,
     QuizAttemptSerializer,
     EnrollmentRequestSerializer,
-    LessonCompletionRequestSerializer,
+    ModuleCompletionRequestSerializer,
     QuizAttemptRequestSerializer,
 )
-from .services import enroll_user_in_course, mark_lesson_complete
+from .services import enroll_user_in_course, mark_module_complete, handle_quiz_submission
 
 
 class ProgressViewSet(viewsets.GenericViewSet):
@@ -32,19 +36,19 @@ class ProgressViewSet(viewsets.GenericViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @action(detail=False, methods=["post"], url_path="complete-lesson")
-    def complete_lesson(self, request):
-        serializer = LessonCompletionRequestSerializer(data=request.data)
+    @action(detail=False, methods=["post"], url_path="complete-module")
+    def complete_module(self, request):
+        serializer = ModuleCompletionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        progress, certificate, recommendation = mark_lesson_complete(
+        progress, certificate, recommendation = mark_module_complete(
             request.user,
-            serializer.validated_data["course_id"],
-            serializer.validated_data["lesson_id"],
+            serializer.validated_data.get("course_id"),
+            serializer.validated_data["module_id"],
         )
 
         payload = {
-            "message": "Lesson completion updated",
+            "message": "Module completion updated",
             "progress": ProgressSerializer(progress).data,
         }
         if certificate:
@@ -79,7 +83,43 @@ class EnrollmentViewSet(viewsets.ReadOnlyModelViewSet):
 class QuizViewSet(viewsets.ModelViewSet):
     serializer_class = QuizSerializer
     permission_classes = [IsAuthenticated]
-    queryset = Quiz.objects.select_related("course", "course__skill")
+    queryset = Quiz.objects.select_related("course", "course__skill", "module").prefetch_related("questions__options")
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        # admins see everything
+        if is_admin(user):
+            return queryset
+        # tutors only their own course quizzes
+        if is_tutor(user):
+            return queryset.filter(course__created_by=user)
+        # students only see published course quizzes
+        if is_student(user):
+            return queryset.filter(course__is_published=True)
+        return queryset.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        course = serializer.validated_data.get("course")
+        if not (is_admin(user) or is_tutor(user)):
+            raise PermissionDenied("Only admins or tutors can create quizzes.")
+        if is_tutor(user) and course and course.created_by_id != user.id:
+            raise PermissionDenied("You can only create quizzes for your own courses.")
+        serializer.save()
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        user = self.request.user
+        if not (is_admin(user) or (is_tutor(user) and instance.course.created_by_id == user.id)):
+            raise PermissionDenied("Only admins or the course creator can update this quiz.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if not (is_admin(user) or (is_tutor(user) and instance.course.created_by_id == user.id)):
+            raise PermissionDenied("Only admins or the course creator can delete this quiz.")
+        instance.delete()
 
 
 class QuizAttemptViewSet(viewsets.GenericViewSet):
@@ -98,6 +138,22 @@ class QuizAttemptViewSet(viewsets.GenericViewSet):
         )
         data = QuizAttemptSerializer(attempt).data
         data["passed"] = attempt.score >= quiz.pass_score
+
+        issued_certificate, recommended_book = handle_quiz_submission(request.user, quiz, attempt)
+        
+        if issued_certificate:
+            data["certificate"] = {
+                "certificate_id": str(issued_certificate.certificate_id),
+                "issued_at": issued_certificate.issued_at,
+            }
+        if recommended_book:
+            data["book_recommendation"] = {
+                "id": recommended_book.id,
+                "title": recommended_book.title,
+                "author": recommended_book.author,
+                "reason": recommended_book.reason,
+            }
+
         return Response(data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"], url_path="my-attempts")

@@ -1,9 +1,13 @@
-﻿from django.conf import settings
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.conf import settings
+from django.db import models
 
 
 class User(AbstractUser):
+    class PreferredLanguage(models.TextChoices):
+        ENGLISH = "en", "English"
+        HAUSA = "ha", "Hausa"
+
     class Roles(models.TextChoices):
         ADMIN = "admin", "Admin"
         TUTOR = "tutor", "Tutor"
@@ -12,6 +16,14 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=Roles.choices, default=Roles.LEARNER)
     bio = models.TextField(blank=True, null=True)
     avatar = models.URLField(blank=True, null=True, help_text="URL to profile picture")
+    job_title = models.CharField(max_length=120, blank=True, default="")
+    location = models.CharField(max_length=150, blank=True, default="")
+    phone = models.CharField(max_length=20, blank=True, default="")
+    preferred_language = models.CharField(
+        max_length=5,
+        choices=PreferredLanguage.choices,
+        default=PreferredLanguage.ENGLISH,
+    )
 
     def __str__(self):
         return f"{self.username} ({self.role})"
@@ -52,4 +64,3 @@ class TutorApplication(models.Model):
     def __str__(self):
         email = getattr(self.user, "email", "") or self.user.username
         return f"{email} - {self.status}"
-

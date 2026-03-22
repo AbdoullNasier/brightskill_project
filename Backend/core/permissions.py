@@ -3,7 +3,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 class IsPlatformAdmin(BasePermission):
     """
-    Allows access only to admin/super_admin users in BrightSkill role model.
+    Allows access only to admin users in BrightSkill role model.
     """
 
     def has_permission(self, request, view):
@@ -11,7 +11,7 @@ class IsPlatformAdmin(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and getattr(user, "role", None) in {"admin", "super_admin"}
+            and getattr(user, "role", None) == "admin"
         )
 
 
@@ -23,5 +23,5 @@ class IsAdminOrReadOnly(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and getattr(user, "role", None) in {"admin", "super_admin", "tutor"}
+            and getattr(user, "role", None) in {"admin", "tutor"}
         )

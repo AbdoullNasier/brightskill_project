@@ -113,3 +113,22 @@ export const updateModule = async (moduleId, payload) => {
 export const deleteModule = async (moduleId) => {
     await api.delete(`/modules/${moduleId}/`);
 };
+
+export const getQuizzes = async (params = {}) => {
+    const response = await api.get('/progress/quiz/', { params });
+    return response.data;
+};
+
+export const createQuiz = async (payload) => {
+    const response = await api.post('/progress/quiz/', payload);
+    return response.data;
+};
+
+export const updateQuiz = async (quizId, payload) => {
+    const response = await api.put(`/progress/quiz/${quizId}/`, payload);
+    return response.data;
+};
+
+export const deleteQuiz = async (quizId) => {
+    await api.delete(`/progress/quiz/${quizId}/`);
+};

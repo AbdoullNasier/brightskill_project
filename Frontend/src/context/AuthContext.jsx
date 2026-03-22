@@ -146,6 +146,7 @@ export const AuthProvider = ({ children }) => {
         setUserProgress(progressMap);
         setCompletedCourses(completed);
         setActiveCourseId(active);
+        window.dispatchEvent(new Event('brightskill-progress-updated'));
     };
 
     useEffect(() => {
@@ -155,7 +156,6 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         if (!isAuthenticated || !tokens.access) return;
 
-        refreshCurrentUser();
         const intervalId = setInterval(() => {
             refreshCurrentUser();
         }, 60000);
@@ -193,6 +193,7 @@ export const AuthProvider = ({ children }) => {
 
             localStorage.setItem('brightskill_tokens', JSON.stringify(nextTokens));
             localStorage.setItem('brightskill_user', JSON.stringify(data.user));
+            window.dispatchEvent(new Event('brightskill-auth-changed'));
 
             fetchProgressSnapshot();
 
@@ -226,19 +227,33 @@ export const AuthProvider = ({ children }) => {
                 }),
             });
 
+            const contentType = response.headers.get('content-type') || '';
+            const isJson = contentType.includes('application/json');
+            const data = isJson ? await response.json().catch(() => ({})) : null;
+
             if (!response.ok) {
-                const error = await response.json();
-                const errorMessage = error.detail || Object.values(error)[0]?.[0] || 'Registration failed';
+                let fallbackMessage = `Registration failed (HTTP ${response.status})`;
+                if (!isJson) {
+                    const htmlText = await response.text().catch(() => '');
+                    if (htmlText) {
+                        fallbackMessage = `Registration failed (server returned HTML, HTTP ${response.status}).`;
+                    }
+                }
+
+                const errorMessage =
+                    data?.detail ||
+                    Object.values(data || {})[0]?.[0] ||
+                    fallbackMessage;
                 throw new Error(errorMessage);
             }
 
-            const data = await response.json();
             const nextTokens = { access: data.access, refresh: data.refresh };
             setTokens(nextTokens);
             setUser(data.user);
             setIsAuthenticated(true);
             localStorage.setItem('brightskill_tokens', JSON.stringify(nextTokens));
             localStorage.setItem('brightskill_user', JSON.stringify(data.user));
+            window.dispatchEvent(new Event('brightskill-auth-changed'));
             fetchProgressSnapshot();
             return data.user;
         } finally {
@@ -255,6 +270,7 @@ export const AuthProvider = ({ children }) => {
         setActiveCourseId(null);
         setUserProgress({});
         setCompletedCourses([]);
+        window.dispatchEvent(new Event('brightskill-auth-changed'));
     };
 
     const updateUser = async (updatedData) => {
@@ -288,19 +304,19 @@ export const AuthProvider = ({ children }) => {
         return response.json();
     };
 
-    const updateCourseProgress = async (courseId, lessonId) => {
-        if (!lessonId) {
-            throw new Error('lessonId is required to update progress');
+    const updateCourseProgress = async (courseId, moduleId) => {
+        if (!moduleId) {
+            throw new Error('moduleId is required to update progress');
         }
 
-        const response = await apiRequest('/progress/complete-lesson/', {
+        const response = await apiRequest('/progress/complete-module/', {
             method: 'POST',
-            body: JSON.stringify({ course_id: courseId, lesson_id: lessonId }),
+            body: JSON.stringify({ course_id: courseId, module_id: moduleId }),
         });
 
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
-            throw new Error(data.detail || 'Failed to update lesson progress');
+            throw new Error(data.detail || 'Failed to update module progress');
         }
 
         await fetchProgressSnapshot();

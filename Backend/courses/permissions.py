@@ -2,7 +2,7 @@ from rest_framework.permissions import BasePermission
 
 
 def is_admin(user):
-    return getattr(user, "role", None) in {"admin", "super_admin"}
+    return getattr(user, "role", None) == "admin"
 
 
 def is_tutor(user):

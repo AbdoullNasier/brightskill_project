@@ -1,98 +1,65 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MdCheckCircle, MdLock, MdSchool, MdLightbulb } from 'react-icons/md';
+import { useNavigate } from 'react-router-dom';
+import { MdCheckCircle, MdSchool } from 'react-icons/md';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+const LESSON_CONTEXT_STORAGE_KEY = 'brightskill_lesson_context';
 
 const LearningPath = () => {
     const navigate = useNavigate();
-    const { activeCourseId, userProgress, apiRequest } = useAuth();
-
-    const [learningPath, setLearningPath] = useState(null);
-    const [activeCourse, setActiveCourse] = useState(null);
-    const [courseModules, setCourseModules] = useState([]);
+    const { apiRequest, userProgress } = useAuth();
+    const [roadmap, setRoadmap] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const loadData = async () => {
+        const loadRoadmap = async () => {
             try {
-                const pathRes = await apiRequest('/interview/path/');
-                if (pathRes.ok) {
-                    const pathData = await pathRes.json();
-                    setLearningPath(pathData);
+                const roadmapRes = await apiRequest('/roadmap/');
+                if (roadmapRes.ok) {
+                    const roadmapData = await roadmapRes.json();
+                    setRoadmap(roadmapData);
+                    return;
                 }
 
-                if (activeCourseId) {
-                    const [courseRes, modulesRes] = await Promise.all([
-                        apiRequest(`/courses/${activeCourseId}/`),
-                        apiRequest(`/courses/${activeCourseId}/modules/`),
-                    ]);
-
-                    if (courseRes.ok) {
-                        setActiveCourse(await courseRes.json());
-                    }
-                    if (modulesRes.ok) {
-                        const modules = await modulesRes.json();
-                        setCourseModules(Array.isArray(modules) ? modules : []);
-                    }
+                // Backward-compatible fallback for older learning path payload.
+                const fallbackRes = await apiRequest('/interview/path/');
+                if (fallbackRes.ok) {
+                    const fallback = await fallbackRes.json();
+                    setRoadmap(fallback);
                 }
             } finally {
                 setLoading(false);
             }
         };
 
-        loadData();
-    }, [activeCourseId]);
+        loadRoadmap();
+    }, [apiRequest]);
 
-    const aiSteps = useMemo(() => {
-        if (!learningPath) return [];
-        const fromWeekly = String(learningPath.weekly_plan || '')
-            .split(';')
-            .map((item) => item.trim())
-            .filter(Boolean)
-            .map((item, index) => ({
-                id: index + 1,
-                title: item,
-                description: learningPath.summary,
-                reason: learningPath.focus_areas?.[index] || 'AI Focus',
-                status: index === 0 ? 'in-progress' : 'locked',
-                duration: '1 week',
-                type: 'plan',
-            }));
+    const stages = useMemo(() => {
+        if (!roadmap) return [];
+        if (Array.isArray(roadmap.stages)) {
+            return [...roadmap.stages].sort((a, b) => Number(a.order_index || 0) - Number(b.order_index || 0));
+        }
+        return [];
+    }, [roadmap]);
 
-        return fromWeekly;
-    }, [learningPath]);
-
-    const courseSteps = useMemo(() => {
-        if (!activeCourse) return [];
-        const percent = Number(userProgress[activeCourse.id] || 0);
-        return courseModules.map((module, index) => ({
-            id: module.id,
-            title: module.title,
-            description: `Module ${module.order_index} in ${activeCourse.title}`,
-            reason: activeCourse.skill_name || 'Course progression',
-            status: percent >= (((index + 1) / Math.max(courseModules.length, 1)) * 100) ? 'completed' : index === 0 ? 'in-progress' : 'locked',
-            duration: '30m',
-            type: 'module',
-        }));
-    }, [activeCourse, courseModules, userProgress]);
-
-    const steps = aiSteps.length > 0 ? aiSteps : courseSteps;
+    const selectedSkill = roadmap?.selected_skill || (Array.isArray(roadmap?.focus_areas) ? roadmap.focus_areas[0] : '');
 
     if (loading) {
         return <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">Loading learning path...</div>;
     }
 
-    if (!steps.length) {
+    if (!roadmap || stages.length === 0) {
         return (
             <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
                 <div className="inline-block p-6 rounded-full bg-gray-100 mb-6">
                     <MdSchool className="text-6xl text-gray-400" />
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">No Active Learning Path</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">No Learning Path Yet</h1>
                 <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                    Complete your assessment to generate an AI learning path, or enroll in a course.
+                    Complete onboarding to generate your personalized roadmap.
                 </p>
                 <div className="flex justify-center gap-4">
                     <Button onClick={() => navigate('/dashboard')} variant="outline" size="lg" className="px-8">
@@ -107,67 +74,89 @@ const LearningPath = () => {
     }
 
     return (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="mb-12 text-center">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{learningPath?.title || activeCourse?.title || 'Learning Path'}</h1>
-                <p className="text-gray-600 max-w-2xl mx-auto">{learningPath?.summary || activeCourse?.description}</p>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+            <div className="mb-8 sm:mb-10 text-center">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">{roadmap.title || 'Learning Path'}</h1>
+                <p className="text-sm sm:text-base text-gray-600 max-w-3xl mx-auto leading-7">{roadmap.summary || 'Roadmap generated from your onboarding interview.'}</p>
+                {selectedSkill && (
+                    <p className="mt-3 inline-block rounded-full bg-indigo-50 text-indigo-700 px-4 py-1 text-sm font-semibold capitalize">
+                        Selected Skill: {selectedSkill}
+                    </p>
+                )}
             </div>
 
-            <div className="relative max-w-3xl mx-auto">
-                <div className="absolute left-8 top-8 bottom-8 w-0.5 bg-gray-200"></div>
+            <div className="max-w-5xl mx-auto space-y-5">
+                {stages.map((stage, index) => {
+                    const stageStatus = stage.is_completed ? 'completed' : 'in-progress';
+                    const courseId = stage.course;
+                    const courseProgress = courseId ? Number(userProgress?.[courseId] || 0) : 0;
 
-                <div className="space-y-12">
-                    {steps.map((step, index) => (
-                        <div key={step.id || index} className="relative pl-24 group">
-                            <div className="absolute left-8 top-8 w-16 h-0.5 bg-gray-200"></div>
-
-                            <div
-                                className={`
-                                absolute left-4 top-4 w-8 h-8 rounded-full border-4 border-white shadow-md z-10 flex items-center justify-center
-                                ${step.status === 'completed' ? 'bg-emerald-500' : step.status === 'in-progress' ? 'bg-indigo-600 ring-4 ring-indigo-100' : 'bg-gray-300'}
-                            `}
-                            >
-                                {step.status === 'completed' && <MdCheckCircle className="text-white text-lg" />}
-                                {step.status === 'locked' && <MdLock className="text-white text-sm" />}
-                            </div>
-
-                            <Card
-                                className={`
-                                transition-all duration-300 relative overflow-hidden
-                                ${step.status === 'in-progress' ? 'border-2 border-indigo-100 shadow-lg transform scale-[1.02]' : 'hover:shadow-md'}
-                                ${step.status === 'locked' ? 'opacity-75 grayscale-[0.5]' : ''}
-                            `}
-                            >
-                                {step.reason && (
-                                    <div className="absolute top-0 right-0 bg-indigo-50 px-3 py-1 rounded-bl-xl border-l border-b border-indigo-100 flex items-center gap-1">
-                                        <MdLightbulb className="text-yellow-500 text-xs" />
-                                        <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wide">AI Why: {step.reason}</span>
+                    return (
+                        <Card key={stage.id || index} className="border border-gray-200">
+                            <div className="p-5 sm:p-6">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Stage {stage.order_index || index + 1}</p>
+                                        <h2 className="text-xl font-bold text-gray-900">{stage.stage_title}</h2>
                                     </div>
-                                )}
-
-                                <div className="p-6">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">{step.title}</h3>
-                                    <div className="flex items-center gap-3 mb-4 text-sm text-gray-500">
-                                        <span className="uppercase font-semibold tracking-wider text-xs">{step.type}</span>
-                                        <span>•</span>
-                                        <span>{step.duration}</span>
+                                    <div className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${stageStatus === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                                        {stageStatus === 'completed' ? <><MdCheckCircle className="mr-1" /> Completed</> : 'In Progress'}
                                     </div>
-                                    <p className="text-gray-600 mb-6">{step.description}</p>
+                                </div>
 
-                                    {step.status !== 'locked' ? (
-                                        <Button onClick={() => navigate(`/lesson/${activeCourseId || step.id}`)} className="w-full sm:w-auto">
-                                            {step.status === 'completed' ? 'Review Module' : 'Start Module'}
-                                        </Button>
+                                <div className="space-y-3 text-sm text-gray-700">
+                                    <p><span className="font-semibold text-gray-900">Objective:</span> {stage.stage_objective}</p>
+                                    <p><span className="font-semibold text-gray-900">What To Do:</span> {stage.learner_actions}</p>
+                                    <p><span className="font-semibold text-gray-900">Practical Exercise:</span> {stage.practical_exercise}</p>
+                                    <p><span className="font-semibold text-gray-900">Habit / Action:</span> {stage.habit_action}</p>
+                                    <p><span className="font-semibold text-gray-900">AI Support:</span> {stage.ai_support_note}</p>
+                                    {courseId ? (
+                                        <p>
+                                            <span className="font-semibold text-gray-900">Course:</span> {stage.course_title || `Course #${courseId}`}
+                                            <span className="ml-2 text-xs text-gray-500">({courseProgress.toFixed(0)}% complete)</span>
+                                        </p>
                                     ) : (
-                                        <div className="flex items-center text-gray-400 text-sm italic">
-                                            <MdLock className="mr-2" /> Complete previous step to unlock
-                                        </div>
+                                        <p><span className="font-semibold text-gray-900">Course:</span> Recommended module will be suggested by FAB.</p>
                                     )}
                                 </div>
-                            </Card>
-                        </div>
-                    ))}
-                </div>
+
+                                <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                                    <Button
+                                        onClick={() => {
+                                            if (courseId) {
+                                                navigate(`/lesson/${courseId}`);
+                                            } else {
+                                                navigate('/skills');
+                                            }
+                                        }}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        {courseId ? 'Open Course/Module' : 'Find Matching Course'}
+                                    </Button>
+
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            const context = {
+                                                from: 'learning-path',
+                                                selected_skill: selectedSkill,
+                                                stage_id: stage.id,
+                                                stage_title: stage.stage_title,
+                                                stage_objective: stage.stage_objective,
+                                                stage_tasks: stage.learner_actions,
+                                            };
+                                            sessionStorage.setItem(LESSON_CONTEXT_STORAGE_KEY, JSON.stringify(context));
+                                            navigate('/ai-roleplay');
+                                        }}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        Practice with AI
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    );
+                })}
             </div>
         </div>
     );

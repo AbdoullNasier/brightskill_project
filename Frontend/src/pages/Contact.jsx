@@ -22,7 +22,7 @@ const Contact = () => {
                                 <MdEmail size={24} className="mt-1 mr-4 opacity-80" />
                                 <div>
                                     <p className="font-semibold">Email</p>
-                                    <p className="opacity-80">support@brightskill.com</p>
+                                    <p className="opacity-80">contact.brightskill@gmail.com</p>
                                 </div>
                             </div>
                             <div className="flex items-start">

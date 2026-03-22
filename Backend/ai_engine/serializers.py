@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from .models import (
     Conversation,
     Message,
@@ -7,33 +8,29 @@ from .models import (
     InterviewAssessment,
     InterviewResponse,
     LearningPath,
+    UserSkillProfile,
+    LearningRoadmap,
+    RoadmapStage,
 )
 
-REQUIRED_INTERVIEW_QUESTIONS = {
-    "career_goal": "What career goal are you trying to achieve in the next 6 months?",
-    "current_challenges": "What are your top soft-skill challenges right now?",
-    "communication_situations": "In which situations do you struggle most with communication?",
-    "confidence_level": "How would you rate your confidence in professional interactions (1-10), and why?",
-    "leadership_experience": "Describe your current leadership or teamwork responsibilities.",
-    "feedback_pattern": "What feedback have you repeatedly received from peers/managers?",
-    "time_commitment": "How many hours per week can you commit to soft-skills development?",
-    "preferred_learning_style": "How do you learn best (reading, practice, role-play, coaching)?",
-    "motivation": "Why is improving these skills important to you personally?",
-    "success_definition": "What would measurable success look like after 8 weeks?",
-}
 
-FIRST_INTERVIEW_QUESTION = {
-    "question_key": "career_goal",
-    "question_text": REQUIRED_INTERVIEW_QUESTIONS["career_goal"],
-}
+SELECTABLE_SOFT_SKILLS = [
+    "communication",
+    "leadership",
+    "emotional intelligence",
+    "critical thinking",
+    "time management",
+    "adaptability",
+]
 
 
 class FABRequestSerializer(serializers.Serializer):
     prompt = serializers.CharField()
     skill = serializers.CharField(required=False, allow_blank=True)
     conversation_id = serializers.IntegerField(required=False)
-    page = serializers.CharField(required=False, default='general')
+    page = serializers.CharField(required=False, default="general")
     page_context = serializers.JSONField(required=False, default=dict)
+
 
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -60,7 +57,17 @@ class RolePlaySessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RolePlaySession
-        fields = ["id", "user", "title", "started_at", "ended_at", "messages"]
+        fields = [
+            "id",
+            "user",
+            "title",
+            "selected_skill",
+            "difficulty",
+            "roadmap_stage",
+            "started_at",
+            "ended_at",
+            "messages",
+        ]
 
 
 class RolePlaySessionUpdateSerializer(serializers.Serializer):
@@ -90,46 +97,54 @@ class InterviewResponseSerializer(serializers.ModelSerializer):
 
 class InterviewAssessmentSerializer(serializers.ModelSerializer):
     responses = InterviewResponseSerializer(many=True, read_only=True)
-    learning_path = LearningPathSerializer(read_only=True)
 
     class Meta:
         model = InterviewAssessment
-        fields = ["id", "user", "created_at", "responses", "learning_path"]
+        fields = ["id", "user", "selected_skill", "is_completed", "created_at", "responses"]
 
 
-class FABRequestSerializer(serializers.Serializer):
-    prompt = serializers.CharField()
-    skill = serializers.CharField(required=False, allow_blank=True)
-    conversation_id = serializers.IntegerField(required=False)
+class RoadmapStageSerializer(serializers.ModelSerializer):
+    course_title = serializers.CharField(source="course.title", read_only=True)
+
+    class Meta:
+        model = RoadmapStage
+        fields = [
+            "id",
+            "order_index",
+            "stage_title",
+            "stage_objective",
+            "learner_actions",
+            "practical_exercise",
+            "habit_action",
+            "course",
+            "course_title",
+            "course_link",
+            "ai_support_note",
+            "is_completed",
+        ]
 
 
-class RolePlayRequestSerializer(serializers.Serializer):
-    prompt = serializers.CharField(required=False, allow_blank=True)
-    session_id = serializers.IntegerField(required=False)
-    end_session = serializers.BooleanField(required=False, default=False)
-    scenario = serializers.CharField(required=False, allow_blank=True)
-    context = serializers.JSONField(required=False, default=dict)
+class LearningRoadmapSerializer(serializers.ModelSerializer):
+    stages = RoadmapStageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = LearningRoadmap
+        fields = ["id", "user", "assessment", "selected_skill", "title", "summary", "generated_at", "stages"]
 
 
-class InterviewSubmitSerializer(serializers.Serializer):
-    responses = serializers.DictField(child=serializers.CharField(), allow_empty=False)
-
-    def validate_responses(self, value):
-        missing = [key for key in REQUIRED_INTERVIEW_QUESTIONS if not str(value.get(key, "")).strip()]
-        if missing:
-            raise serializers.ValidationError(
-                {"missing_required_questions": missing, "required_questions": REQUIRED_INTERVIEW_QUESTIONS}
-            )
-        return value
+class UserSkillProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSkillProfile
+        fields = ["selected_skill", "current_stage_index", "updated_at"]
 
 
-class InterviewStartSerializer(serializers.Serializer):
-    pass
+class OnboardingSelectSkillSerializer(serializers.Serializer):
+    selected_skill = serializers.ChoiceField(choices=SELECTABLE_SOFT_SKILLS)
 
 
-class InterviewAnswerSerializer(serializers.Serializer):
+class OnboardingInterviewSerializer(serializers.Serializer):
     assessment_id = serializers.IntegerField()
-    question_key = serializers.CharField(max_length=100)
+    question_key = serializers.CharField(max_length=120)
     question_text = serializers.CharField()
     response_text = serializers.CharField(allow_blank=False)
 
@@ -140,5 +155,26 @@ class InterviewAnswerSerializer(serializers.Serializer):
         return clean
 
 
-class InterviewFinishSerializer(serializers.Serializer):
+class OnboardingGenerateRoadmapSerializer(serializers.Serializer):
     assessment_id = serializers.IntegerField()
+
+
+class RolePlayStartSerializer(serializers.Serializer):
+    selected_skill = serializers.ChoiceField(choices=SELECTABLE_SOFT_SKILLS)
+    difficulty = serializers.ChoiceField(choices=["beginner", "intermediate", "advanced"], required=False, default="intermediate")
+    roadmap_stage_id = serializers.IntegerField(required=False)
+    scenario = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class RolePlayMessageRequestSerializer(serializers.Serializer):
+    session_id = serializers.IntegerField()
+    message = serializers.CharField(required=False, allow_blank=True, default="")
+    end_session = serializers.BooleanField(required=False, default=False)
+
+
+class RolePlayRequestSerializer(serializers.Serializer):
+    prompt = serializers.CharField(required=False, allow_blank=True, default="")
+    session_id = serializers.IntegerField(required=False)
+    end_session = serializers.BooleanField(required=False, default=False)
+    scenario = serializers.CharField(required=False, allow_blank=True, default="")
+    context = serializers.JSONField(required=False, default=dict)

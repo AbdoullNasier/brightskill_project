@@ -14,7 +14,7 @@ import { motion } from 'framer-motion';
 
 const Dashboard = () => {
     const { user, apiRequest } = useAuth();
-    const { badges } = useGamification();
+    const { badges, refreshGamification } = useGamification();
     const { t } = useLanguage();
     const navigate = useNavigate();
     const displayName = user?.first_name || user?.username || 'User';
@@ -23,9 +23,11 @@ const Dashboard = () => {
     const [showCareerModal, setShowCareerModal] = useState(false);
     const [dashboardData, setDashboardData] = useState(null);
     const [bookRecommendations, setBookRecommendations] = useState([]);
+    const [interviewBookRecommendation, setInterviewBookRecommendation] = useState(null);
 
     useEffect(() => {
         const loadDashboard = async () => {
+            refreshGamification();
             const [dashboardRes, booksRes] = await Promise.all([
                 apiRequest('/auth/dashboard/'),
                 apiRequest('/books/'),
@@ -41,12 +43,19 @@ const Dashboard = () => {
 
             if (booksRes.ok) {
                 const books = await booksRes.json();
-                setBookRecommendations(Array.isArray(books) ? books.slice(0, 2) : []);
+                const normalizedBooks = Array.isArray(books) ? books : [];
+                const interviewBook = normalizedBooks.find((book) => book.source_type === 'conversation') || null;
+                setInterviewBookRecommendation(interviewBook);
+                setBookRecommendations(
+                    normalizedBooks
+                        .filter((book) => !interviewBook || book.id !== interviewBook.id)
+                        .slice(0, 2)
+                );
             }
         };
 
         loadDashboard();
-    }, [user?.id]);
+    }, [user?.id, refreshGamification]);
 
     const handleCloseModal = () => setShowCareerModal(false);
 
@@ -133,6 +142,20 @@ const Dashboard = () => {
                             </div>
                         ) : (
                             <Card className="p-6">No active course. Start from the skills page.</Card>
+                        )}
+                    </section>
+
+                    <section>
+                        <h2 className="text-lg font-bold text-gray-800 mb-4">From Your Interview</h2>
+                        {interviewBookRecommendation ? (
+                            <Card className="p-5 border border-indigo-100 bg-indigo-50/60" hover={false}>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-2">Recommended Book</p>
+                                <h3 className="text-lg font-bold text-gray-900 mb-1">{interviewBookRecommendation.title}</h3>
+                                <p className="text-sm text-gray-600 mb-2">{interviewBookRecommendation.author}</p>
+                                <p className="text-sm text-gray-700 leading-7">{interviewBookRecommendation.reason}</p>
+                            </Card>
+                        ) : (
+                            <Card className="p-4">No interview recommendation yet. Complete your assessment to get a contextual book recommendation.</Card>
                         )}
                     </section>
 

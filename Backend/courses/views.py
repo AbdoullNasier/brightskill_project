@@ -1,7 +1,6 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.permissions import IsAdminOrReadOnly
@@ -11,14 +10,20 @@ from .serializers import SkillSerializer, CourseSerializer, LessonSerializer, Mo
 
 
 class SkillViewSet(viewsets.ModelViewSet):
-    queryset = Skill.objects.all()
     serializer_class = SkillSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAdminOrReadOnly]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Skill.objects.all()
+        if user.is_authenticated and (is_admin(user) or is_tutor(user)):
+            return queryset
+        return queryset.filter(courses__is_active=True, courses__is_published=True).distinct()
 
 
 class CourseViewSet(viewsets.ModelViewSet):
     serializer_class = CourseSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def get_queryset(self):
         queryset = (
@@ -33,14 +38,12 @@ class CourseViewSet(viewsets.ModelViewSet):
         tutor_id = self.request.query_params.get("tutor")
         search = self.request.query_params.get("search")
 
-        if is_admin(user):
+        if user.is_authenticated and is_admin(user):
             pass
-        elif is_tutor(user):
+        elif user.is_authenticated and is_tutor(user):
             queryset = queryset.filter(created_by=user)
-        elif is_student(user):
-            queryset = queryset.filter(is_published=True)
         else:
-            queryset = queryset.none()
+            queryset = queryset.filter(is_published=True)
 
         if skill_id:
             queryset = queryset.filter(skill_id=skill_id)
@@ -48,7 +51,7 @@ class CourseViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(difficulty=difficulty)
         if published is not None:
             queryset = queryset.filter(is_published=str(published).lower() == "true")
-        if tutor_id and is_admin(user):
+        if tutor_id and user.is_authenticated and is_admin(user):
             queryset = queryset.filter(created_by_id=tutor_id)
         if search:
             queryset = queryset.filter(title__icontains=search)
@@ -56,7 +59,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if not (is_admin(user) or is_tutor(user)):
+        if not (user.is_authenticated and (is_admin(user) or is_tutor(user))):
             raise PermissionDenied("Only admins or tutors can create courses.")
         serializer.save(created_by=user)
 
@@ -79,8 +82,13 @@ class CourseViewSet(viewsets.ModelViewSet):
         modules_qs = Module.objects.filter(course=course, course__is_active=True).order_by("order_index", "id")
 
         if request.method.lower() == "get":
-            serializer = ModuleSerializer(modules_qs, many=True)
-            return Response(serializer.data)
+            if request.user.is_authenticated and (is_admin(request.user) or (is_tutor(request.user) and course.created_by_id == request.user.id)):
+                serializer = ModuleSerializer(modules_qs, many=True)
+                return Response(serializer.data)
+            if course.is_published:
+                serializer = ModuleSerializer(modules_qs, many=True)
+                return Response(serializer.data)
+            raise PermissionDenied("This course is not publicly available.")
 
         if not IsCourseCreatorOrAdmin().has_object_permission(request, self, course):
             raise PermissionDenied("Only the course creator or an admin can add modules.")
@@ -93,16 +101,16 @@ class CourseViewSet(viewsets.ModelViewSet):
 
 class LessonViewSet(viewsets.ModelViewSet):
     serializer_class = LessonSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
         queryset = Lesson.objects.select_related("course", "course__skill").filter(course__is_active=True)
         user = self.request.user
         course_id = self.request.query_params.get("course")
 
-        if getattr(user, "role", None) == "tutor":
+        if user.is_authenticated and getattr(user, "role", None) == "tutor":
             queryset = queryset.filter(course__created_by=user)
-        elif is_student(user):
+        elif not user.is_authenticated or is_student(user):
             queryset = queryset.filter(course__is_published=True)
         if course_id:
             queryset = queryset.filter(course_id=course_id)
@@ -132,18 +140,16 @@ class LessonViewSet(viewsets.ModelViewSet):
 class ModuleViewSet(viewsets.GenericViewSet):
     queryset = Module.objects.select_related("course", "course__created_by").filter(course__is_active=True)
     serializer_class = ModuleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
-        if is_admin(user):
+        if user.is_authenticated and is_admin(user):
             return queryset
-        if is_tutor(user):
+        if user.is_authenticated and is_tutor(user):
             return queryset.filter(course__created_by=user)
-        if is_student(user):
-            return queryset.filter(course__is_published=True)
-        return queryset.none()
+        return queryset.filter(course__is_published=True)
 
     def retrieve(self, request, *args, **kwargs):
         module = self.get_object()

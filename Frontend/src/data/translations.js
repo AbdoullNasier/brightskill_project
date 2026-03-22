@@ -65,7 +65,7 @@ export const translations = {
     'home.feature3_desc': { EN: 'Master the soft skills that top employers are looking for.', HA: 'Kware a dabarun da manyan kamfanoni ke neman ma\'botan su.' },
     'home.how_it_works': { EN: 'How BrightSkill Works', HA: 'Yadda BrightSkill Yake Aiki' },
     'home.how_desc': { EN: 'A simple, guided journey to help you build real-world soft skills.', HA: 'Hanya mai sauƙi don taimaka muku wajen gina dabarun rayuwa da sana\'a a duniyar yau.' },
-    'home.full_path': { EN: 'See Full Learning Path', HA: 'Duba Cikakkiyar Hanyar Koyo' },
+    'home.full_path': { EN: 'See the Full Path', HA: 'Duba Cikakkiyar Hanyar Koyo' },
     'btn.start': { EN: 'Get Started', HA: 'Fara Yanzu' },
     'btn.learn_more': { EN: 'Learn More', HA: 'Karin Bayani' },
 

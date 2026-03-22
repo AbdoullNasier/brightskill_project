@@ -40,7 +40,7 @@ const PrivacyPolicy = () => {
                     <section>
                         <h2 className="text-xl font-semibold text-white mb-3">5. Contact Us</h2>
                         <p className="leading-relaxed text-gray-400">
-                            If you have any questions about this Privacy Policy, please contact us at <span className="text-primary font-medium">privacy@brightskill.com</span>.
+                            If you have any questions about this Privacy Policy, please contact us at <span className="text-primary font-medium">contact.brightskill@gmail.com</span>.
                         </p>
                     </section>
                 </div>

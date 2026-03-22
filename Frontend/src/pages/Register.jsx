@@ -36,7 +36,7 @@ const Register = () => {
     const redirectByRole = (registeredUser) => {
         if (location.state?.from) {
             navigate(location.state.from);
-        } else if (['admin', 'super_admin'].includes(registeredUser.role)) {
+        } else if (registeredUser.role === 'admin') {
             navigate('/admin/dashboard');
         } else if (registeredUser.role === 'tutor') {
             navigate('/admin/tutor-dashboard');
@@ -64,7 +64,8 @@ const Register = () => {
         try {
             const registeredUser = await register(name, username, email, password, confirmPassword);
             setSuccess('Registration successful. Redirecting...');
-            setTimeout(() => redirectByRole(registeredUser), 1500);
+            // no artificial delay, go straight to the appropriate page
+            redirectByRole(registeredUser);
         } catch (err) {
             setError(err.message || 'Failed to create an account');
         }
@@ -178,4 +179,3 @@ const Register = () => {
 };
 
 export default Register;
-

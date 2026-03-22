@@ -8,7 +8,7 @@ const Button = ({ children, onClick, variant = 'primary', className = '', ...pro
         primary: "bg-primary text-white hover:bg-indigo-700 focus:ring-indigo-500 shadow-md hover:shadow-lg",
         secondary: "bg-secondary text-white hover:bg-emerald-600 focus:ring-emerald-500 shadow-md hover:shadow-lg",
         outline: "border-2 border-primary text-primary hover:bg-primary hover:text-white focus:ring-indigo-500",
-        ghost: "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
+        ghost: "text-primary hover:bg-primary hover:text-white focus:ring-indigo-500",
     };
 
     return (

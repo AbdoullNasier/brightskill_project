@@ -1,27 +1,69 @@
-import React, { useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { MdDownload, MdArrowBack } from 'react-icons/md';
 import Button from '../components/Button';
+import { useAuth } from '../context/AuthContext';
 
 import logo from '../assets/images/logo1.png';
 
 const Certificate = () => {
-    const location = useLocation();
     const navigate = useNavigate();
+    const { courseId } = useParams();
+    const { apiRequest, user } = useAuth();
     const certificateRef = useRef(null);
+    const [certificate, setCertificate] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    // Get data from location state or fallback (for testing)
-    const { studentName, courseName, date } = location.state || {
-        studentName: "Student Name",
-        courseName: "Course Title",
-        date: new Date().toLocaleDateString()
-    };
+    useEffect(() => {
+        const loadCertificate = async () => {
+            setLoading(true);
+            setError('');
+
+            try {
+                const response = await apiRequest('/certificates/');
+                if (!response.ok) {
+                    throw new Error('Failed to load certificates.');
+                }
+
+                const data = await response.json();
+                const certificates = Array.isArray(data) ? data : [];
+                const selectedCertificate = courseId
+                    ? certificates.find((item) => Number(item.course) === Number(courseId))
+                    : certificates[0];
+
+                if (!selectedCertificate) {
+                    setCertificate(null);
+                    setError('No issued certificate was found for this course yet.');
+                    return;
+                }
+
+                setCertificate(selectedCertificate);
+            } catch (loadError) {
+                setCertificate(null);
+                setError(loadError.message || 'Failed to load certificate.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadCertificate();
+    }, [apiRequest, courseId]);
+
+    const studentName = useMemo(
+        () => user?.first_name || user?.username || 'Learner',
+        [user]
+    );
+    const courseName = certificate?.course_title || 'Course';
+    const date = certificate?.issued_at
+        ? new Date(certificate.issued_at).toLocaleDateString()
+        : '';
 
     const handleDownload = async () => {
         const element = certificateRef.current;
-        if (!element) return;
+        if (!element || !certificate) return;
 
         try {
             const canvas = await html2canvas(element, {
@@ -43,6 +85,21 @@ const Certificate = () => {
             console.error("Certificate generation failed", error);
         }
     };
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center p-4">Loading certificate...</div>;
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4 text-center">
+                <p className="text-lg text-gray-700">{error}</p>
+                <Button variant="outline" onClick={() => navigate('/skills')}>
+                    Back to Courses
+                </Button>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
@@ -112,6 +169,10 @@ const Certificate = () => {
                         <span className="text-sm text-gray-500 mt-2">Instructor</span>
                     </div>
                 </div>
+
+                <p className="absolute bottom-6 text-xs tracking-wide text-gray-500">
+                    Certificate ID: {certificate?.certificate_id}
+                </p>
             </div>
         </div>
     );

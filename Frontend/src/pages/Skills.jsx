@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Card from '../components/Card';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProgressBar from '../components/ProgressBar';
@@ -29,13 +29,14 @@ const Skills = () => {
     const { t } = useLanguage();
 
     const [courses, setCourses] = useState([]);
+    const [issuedCertificateCourseIds, setIssuedCertificateCourseIds] = useState(new Set());
     const [loading, setLoading] = useState(true);
     const displayName = user?.first_name || user?.username || 'User';
 
     useEffect(() => {
         const loadCourses = async () => {
             try {
-                const response = await apiRequest('/courses/courses/');
+                const response = await apiRequest('/courses/');
                 if (!response.ok) {
                     setCourses([]);
                     return;
@@ -48,9 +49,38 @@ const Skills = () => {
         };
 
         loadCourses();
-    }, []);
+    }, [apiRequest]);
 
-    const handleStartLearning = async (course, isCompleted, isActive, isLocked) => {
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setIssuedCertificateCourseIds(new Set());
+            return;
+        }
+
+        const loadCertificates = async () => {
+            try {
+                const response = await apiRequest('/certificates/');
+                if (!response.ok) {
+                    setIssuedCertificateCourseIds(new Set());
+                    return;
+                }
+
+                const data = await response.json();
+                const courseIds = new Set(
+                    (Array.isArray(data) ? data : [])
+                        .map((certificate) => Number(certificate.course))
+                        .filter(Boolean)
+                );
+                setIssuedCertificateCourseIds(courseIds);
+            } catch {
+                setIssuedCertificateCourseIds(new Set());
+            }
+        };
+
+        loadCertificates();
+    }, [isAuthenticated, apiRequest]);
+
+    const handleStartLearning = async (course, isCompleted, hasCertificate, isActive, isLocked) => {
         if (!isAuthenticated) {
             navigate('/login', { state: { from: location.pathname } });
             return;
@@ -61,12 +91,17 @@ const Skills = () => {
             return;
         }
 
-        if (isCompleted) {
-            navigate('/certificate', {
+        if (isCompleted && hasCertificate) {
+            navigate(`/certificate/${course.id}`);
+            return;
+        }
+
+        if (isCompleted && !hasCertificate) {
+            navigate(`/lesson/${course.id}`, {
                 state: {
+                    focusFinalExam: true,
                     courseName: course.title,
                     studentName: displayName,
-                    date: new Date().toLocaleDateString(),
                 },
             });
             return;
@@ -93,6 +128,7 @@ const Skills = () => {
                     const IconComponent = Icons[iconKey] || Icons.MdWork;
                     const currentProgress = userProgress[course.id] || 0;
                     const isCompleted = completedCourses.includes(course.id) || currentProgress >= 100;
+                    const hasCertificate = issuedCertificateCourseIds.has(course.id);
                     const isActive = activeCourseId === course.id;
                     const isLocked = isAuthenticated && activeCourseId && !isActive && !isCompleted;
 
@@ -125,15 +161,17 @@ const Skills = () => {
 
                                 <div className="mt-4">
                                     <Button
-                                        onClick={() => handleStartLearning(course, isCompleted, isActive, isLocked)}
+                                        onClick={() => handleStartLearning(course, isCompleted, hasCertificate, isActive, isLocked)}
                                         className="w-full"
                                         variant={isCompleted ? 'primary' : isActive ? 'primary' : 'outline'}
                                         disabled={isLocked}
                                     >
                                         {!isAuthenticated
                                             ? t('skills.start_learning')
-                                            : isCompleted
-                                                ? 'Completed, Get Certificate'
+                                            : isCompleted && hasCertificate
+                                                ? 'View Certificate'
+                                                : isCompleted
+                                                    ? 'Take Final Exam'
                                                 : isActive
                                                     ? 'Continue Learning'
                                                     : isLocked

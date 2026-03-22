@@ -40,7 +40,7 @@ const Footer = () => {
                     <div>
                         <h4 className="font-semibold text-lg mb-4">Contact</h4>
                         <ul className="space-y-3 text-gray-400 text-sm">
-                            <li className="flex items-center"><MdEmail className="mr-2" /> support@brightskill.com</li>
+                            <li className="flex items-center"><MdEmail className="mr-2" /> contact.brightskill@gmail.com</li>
                             <li className="flex items-center"><MdPhone className="mr-2" /> +234 810 774 8773</li>
                             <li className="flex items-center"><MdLocationOn className="mr-2" /> Kano, Nigeria</li>
                         </ul>

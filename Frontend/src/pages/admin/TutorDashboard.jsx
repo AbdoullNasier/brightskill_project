@@ -16,10 +16,11 @@ const TutorDashboard = () => {
 
     const loadCourses = async () => {
         try {
-            const data = await apiGet('/courses/courses/');
-            setCourses(data);
-            if (!form.course && data.length > 0) {
-                setForm((prev) => ({ ...prev, course: String(data[0].id) }));
+            const data = await apiGet('/courses/');
+            const rows = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+            setCourses(rows);
+            if (!form.course && rows.length > 0) {
+                setForm((prev) => ({ ...prev, course: String(rows[0].id) }));
             }
         } catch (err) {
             setError(err.message || 'Failed to load courses');
@@ -39,14 +40,13 @@ const TutorDashboard = () => {
             return;
         }
         try {
-            await apiPost('/courses/lessons/', {
-                course: Number(form.course),
+            await apiPost(`/courses/${Number(form.course)}/modules/`, {
                 title: form.title.trim(),
-                order: Number(form.order) || 1,
+                order_index: Number(form.order) || 1,
                 content: form.content.trim(),
-                video_url: form.video_url.trim() || null,
+                youtube_url: form.video_url.trim() || null,
             });
-            setSuccess('Lesson created successfully.');
+            setSuccess('Module created successfully.');
             setForm((prev) => ({
                 ...prev,
                 title: '',
@@ -56,7 +56,7 @@ const TutorDashboard = () => {
             }));
             await loadCourses();
         } catch (err) {
-            setError(err.message || 'Failed to create lesson');
+            setError(err.message || 'Failed to create module');
         }
     };
 
@@ -72,7 +72,7 @@ const TutorDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
                     <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                        <MdUploadFile className="mr-2 text-primary" /> Create New Lesson
+                        <MdUploadFile className="mr-2 text-primary" /> Create New Module
                     </h2>
                     <form className="space-y-4" onSubmit={submitLesson}>
                         <div>
@@ -88,27 +88,27 @@ const TutorDashboard = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Lesson Title</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Module Title</label>
                             <input
                                 type="text"
                                 className="w-full p-2 border border-gray-300 rounded-lg"
                                 value={form.title}
                                 onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                                placeholder="e.g. Advanced Leadership Skills"
+                                placeholder="e.g. Difficult Conversations"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Reading Content</label>
                             <textarea
                                 className="w-full p-2 border border-gray-300 rounded-lg"
                                 rows="6"
                                 value={form.content}
                                 onChange={(e) => setForm((prev) => ({ ...prev, content: e.target.value }))}
-                                placeholder="Lesson content"
+                                placeholder="Module reading content"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Lesson Video URL (optional)</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">YouTube Video URL (optional)</label>
                             <input
                                 type="url"
                                 className="w-full p-2 border border-gray-300 rounded-lg"
@@ -129,7 +129,7 @@ const TutorDashboard = () => {
                         </div>
                         <div className="pt-4">
                             <button type="submit" className="w-full bg-primary text-white py-3 rounded-xl font-semibold hover:bg-primary-dark transition-colors">
-                                Save Lesson
+                                Save Module
                             </button>
                         </div>
                     </form>
@@ -144,7 +144,7 @@ const TutorDashboard = () => {
                             <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                                 <div>
                                     <h4 className="font-bold text-gray-800">{item.title}</h4>
-                                    <p className="text-sm text-gray-500">{item.lessons?.length || 0} lessons</p>
+                                    <p className="text-sm text-gray-500">{item.modules?.length || 0} modules</p>
                                 </div>
                             </div>
                         ))}

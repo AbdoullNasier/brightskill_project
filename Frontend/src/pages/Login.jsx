@@ -21,7 +21,7 @@ const Login = () => {
   const redirectByRole = (loggedInUser) => {
     if (location.state?.from) {
       navigate(location.state.from);
-    } else if (['admin', 'super_admin'].includes(loggedInUser.role)) {
+    } else if (loggedInUser.role === 'admin') {
       navigate('/admin/dashboard');
     } else if (loggedInUser.role === 'tutor') {
       navigate('/admin/tutor-dashboard');
@@ -40,11 +40,8 @@ const Login = () => {
 
       if (result.success) {
         setSuccess(result.message);
-
-        setTimeout(() => {
-          redirectByRole(result.user);
-      }, 1500);
-
+        // navigate immediately once login succeeds (no unnecessary delay)
+        redirectByRole(result.user);
     } else {
       setError(result.message);
     }

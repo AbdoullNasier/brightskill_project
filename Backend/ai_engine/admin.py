@@ -1,14 +1,29 @@
-from accounts.admin import user_admin
+from django.contrib import admin
 
 from .models import (
     Conversation,
+    Message,
+    RolePlaySession,
+    RolePlayMessage,
     InterviewAssessment,
     InterviewResponse,
     LearningPath,
-    Message,
-    RolePlayMessage,
-    RolePlaySession,
+    UserSkillProfile,
+    LearningRoadmap,
+    RoadmapStage,
 )
 
-
-user_admin.register([Conversation, InterviewAssessment, InterviewResponse, LearningPath, Message, RolePlayMessage, RolePlaySession])
+admin.site.register(
+    [
+        Conversation,
+        Message,
+        RolePlaySession,
+        RolePlayMessage,
+        InterviewAssessment,
+        InterviewResponse,
+        LearningPath,
+        UserSkillProfile,
+        LearningRoadmap,
+        RoadmapStage,
+    ]
+)

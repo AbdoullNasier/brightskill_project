@@ -19,7 +19,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
     }
 
     if (allowedRoles && !allowedRoles.includes(user.role)) {
-        if (['admin', 'super_admin'].includes(user.role)) {
+        if (user.role === 'admin') {
             return <Navigate to="/admin/dashboard" replace />;
         }
         if (user.role === 'tutor') {

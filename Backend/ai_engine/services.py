@@ -9,6 +9,13 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ClientError
 
+try:
+    from langdetect import detect
+    from langdetect.lang_detect_exception import LangDetectException
+except Exception:  # pragma: no cover - fallback when dependency is missing
+    detect = None
+    LangDetectException = Exception
+
 
 SOFT_SKILLS_TOPICS = {
     "communication",
@@ -41,6 +48,29 @@ OFF_TOPIC_HINTS = {
 _client = None
 
 
+def detect_user_language(text: str) -> str:
+    clean = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(clean) < 12 or detect is None:
+        return "en"
+    try:
+        code = detect(clean)
+        return "ha" if code == "ha" else "en"
+    except LangDetectException:
+        return "en"
+    except Exception:
+        return "en"
+
+
+def _build_response_language_instruction(source_text: str = "", response_language: str | None = None) -> str:
+    lang = (response_language or "").strip().lower() or detect_user_language(source_text)
+    if lang == "ha":
+        return (
+            "Respond in Hausa (Hausa language), clear and natural. "
+            "If technical words are better in English, keep them minimal and explain in Hausa."
+        )
+    return "Respond in clear English."
+
+
 def _build_generation_config(temperature=0.4, max_output_tokens=None):
     kwargs = {"temperature": temperature}
     if max_output_tokens is not None:
@@ -54,10 +84,16 @@ def _build_generation_config(temperature=0.4, max_output_tokens=None):
 
 # cache and context-aware function
 
-def _cache_key(context: AIContext, user_id: int, query: str, page_data: dict) -> str:
+def _cache_key(
+    context: AIContext,
+    user_id: int,
+    query: str,
+    page_data: dict,
+    response_language: str = "en",
+) -> str:
     """Generate a unique cache key for a query."""
     data_str = json.dumps(page_data, sort_keys=True)
-    unique = f"{context.value}:{user_id}:{query}:{data_str}"
+    unique = f"{context.value}:{user_id}:{response_language}:{query}:{data_str}"
     return hashlib.md5(unique.encode()).hexdigest()
 
 def ask_gemini_with_context(
@@ -65,21 +101,36 @@ def ask_gemini_with_context(
     context: AIContext,
     page_data: dict,
     user_id: int,
-    max_tokens: int = 200,
+    max_tokens: int = 12000,
     temperature: float = 0.3,
-    use_cache: bool = True
+    use_cache: bool = True,
+    response_language: str = "en",
 ) -> str:
     """Context-aware AI call with caching."""
-    cache_key = _cache_key(context, user_id, query, page_data) if use_cache else None
+    cache_key = (
+        _cache_key(context, user_id, query, page_data, response_language=response_language)
+        if use_cache
+        else None
+    )
     if use_cache:
         cached = cache.get(cache_key)
         if cached:
             return cached
 
-    system = build_system_prompt(context, page_data)
-    full_prompt = f"{system}\n\nUser: {query}\nAI:"
+    system = build_system_prompt(context, page_data, language=response_language)
+    language_instruction = _build_response_language_instruction(
+        source_text=query,
+        response_language=response_language,
+    )
+    full_prompt = f"{system}\n\nLanguage policy: {language_instruction}\n\nUser: {query}\nAI:"
     
-    result = ask_gemini(full_prompt, max_output_tokens=max_tokens, temperature=temperature)
+    result = ask_gemini(
+        full_prompt,
+        max_output_tokens=max_tokens,
+        temperature=temperature,
+        source_text=query,
+        response_language=response_language,
+    )
     
     if use_cache and result and not result.startswith("I could not reach"):
         cache.set(cache_key, result, timeout=3600)  # 1 hour cache
@@ -90,12 +141,17 @@ def stream_gemini_with_context(
     context: AIContext,
     page_data: dict,
     user_id: int,
-    max_tokens: int = 200,
-    temperature: float = 0.3
+    max_tokens: int = 12000,
+    temperature: float = 0.3,
+    response_language: str = "en",
 ):
     """Stream the response chunk by chunk."""
-    system = build_system_prompt(context, page_data)
-    full_prompt = f"{system}\n\nUser: {query}\nAI:"
+    system = build_system_prompt(context, page_data, language=response_language)
+    language_instruction = _build_response_language_instruction(
+        source_text=query,
+        response_language=response_language,
+    )
+    full_prompt = f"{system}\n\nLanguage policy: {language_instruction}\n\nUser: {query}\nAI:"
     
     client = _get_client()
     if not client:
@@ -104,7 +160,7 @@ def stream_gemini_with_context(
 
     try:
         response = client.models.generate_content_stream(
-            model=config("GEMINI_MODEL", default="gemini-3-flash-preview"),
+            model=config("GEMINI_MODEL", default="gemini-2.5-flash"),
             contents=full_prompt,
             config=_build_generation_config(
                 temperature=temperature,
@@ -119,6 +175,8 @@ def stream_gemini_with_context(
 
 def is_off_topic(user_prompt):
     normalized = re.sub(r"\s+", " ", user_prompt.lower()).strip()
+    if detect_user_language(normalized) == "ha":
+        return False
     if any(term in normalized for term in OFF_TOPIC_HINTS):
         return True
     return not any(topic in normalized for topic in SOFT_SKILLS_TOPICS)
@@ -145,15 +203,28 @@ def _get_client():
     return _client
 
 
-def ask_gemini(prompt, max_output_tokens=180, temperature=0.4, timeout_seconds=12):
+def ask_gemini(
+    prompt,
+    max_output_tokens=12000,
+    temperature=0.4,
+    timeout_seconds=12,
+    source_text="",
+    response_language="en",
+):
     client = _get_client()
     if client is None:
         return "I can help with soft skills coaching, but the AI service key is not configured yet."
 
+    language_instruction = _build_response_language_instruction(
+        source_text=source_text,
+        response_language=response_language,
+    )
+    full_prompt = f"Language policy: {language_instruction}\n\n{prompt}"
+
     try:
         response = client.models.generate_content(
-            model=config("GEMINI_MODEL", default="gemini-3-flash-preview"),
-            contents=prompt,
+            model=config("GEMINI_MODEL", default="gemini-2.5-flash"),
+            contents=full_prompt,
             config=_build_generation_config(
                 temperature=temperature,
                 max_output_tokens=max_output_tokens,
