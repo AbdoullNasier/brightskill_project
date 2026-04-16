@@ -275,7 +275,7 @@ const AIAssistant = () => {
                                             : 'bg-white text-gray-700 rounded-bl-none border border-gray-100'
                                     }`}
                                 >
-                                    <p>{msg.text}</p>
+                                    <p className="whitespace-pre-wrap break-words">{msg.text}</p>
                                     <p className={`text-[10px] mt-1 ${msg.sender === 'user' ? 'text-indigo-200' : 'text-gray-400'}`}>
                                         {msg.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </p>

@@ -1,4 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+    clearStoredTokens,
+    getStoredTokens,
+    getStoredUser,
+    saveStoredTokens,
+    saveStoredUser,
+} from '../utils/tokenStorage';
 
 const AuthContext = createContext();
 
@@ -28,19 +35,18 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const initializeAuth = () => {
             try {
-                const storedTokens = localStorage.getItem('brightskill_tokens');
-                const storedUser = localStorage.getItem('brightskill_user');
+                const parsedTokens = getStoredTokens();
+                const parsedUser = getStoredUser();
 
-                if (storedTokens && storedUser && storedTokens !== 'undefined' && storedUser !== 'undefined') {
-                    const parsedTokens = JSON.parse(storedTokens);
-                    const parsedUser = JSON.parse(storedUser);
+                if (parsedTokens?.access && parsedUser) {
                     setTokens(parsedTokens);
                     setUser(parsedUser);
                     setIsAuthenticated(true);
+                } else if (parsedTokens || parsedUser) {
+                    clearStoredTokens();
                 }
             } catch (error) {
-                localStorage.removeItem('brightskill_tokens');
-                localStorage.removeItem('brightskill_user');
+                clearStoredTokens();
             } finally {
                 setInitializing(false);
                 setLoading(false);
@@ -72,7 +78,7 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json();
             const nextTokens = { ...tokens, access: data.access };
             setTokens(nextTokens);
-            localStorage.setItem('brightskill_tokens', JSON.stringify(nextTokens));
+            saveStoredTokens(nextTokens);
             return data.access;
         } catch (error) {
             logout();
@@ -112,7 +118,7 @@ export const AuthProvider = ({ children }) => {
 
         const latestUser = await response.json();
         setUser(latestUser);
-        localStorage.setItem('brightskill_user', JSON.stringify(latestUser));
+        saveStoredUser(latestUser);
         return latestUser;
     };
 
@@ -191,8 +197,8 @@ export const AuthProvider = ({ children }) => {
             setUser(data.user);
             setIsAuthenticated(true);
 
-            localStorage.setItem('brightskill_tokens', JSON.stringify(nextTokens));
-            localStorage.setItem('brightskill_user', JSON.stringify(data.user));
+            saveStoredTokens(nextTokens);
+            saveStoredUser(data.user);
             window.dispatchEvent(new Event('brightskill-auth-changed'));
 
             fetchProgressSnapshot();
@@ -251,8 +257,8 @@ export const AuthProvider = ({ children }) => {
             setTokens(nextTokens);
             setUser(data.user);
             setIsAuthenticated(true);
-            localStorage.setItem('brightskill_tokens', JSON.stringify(nextTokens));
-            localStorage.setItem('brightskill_user', JSON.stringify(data.user));
+            saveStoredTokens(nextTokens);
+            saveStoredUser(data.user);
             window.dispatchEvent(new Event('brightskill-auth-changed'));
             fetchProgressSnapshot();
             return data.user;
@@ -262,8 +268,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
-        localStorage.removeItem('brightskill_tokens');
-        localStorage.removeItem('brightskill_user');
+        clearStoredTokens();
         setTokens({ access: null, refresh: null });
         setUser(null);
         setIsAuthenticated(false);
@@ -285,7 +290,7 @@ export const AuthProvider = ({ children }) => {
 
         const updatedUser = await response.json();
         setUser(updatedUser);
-        localStorage.setItem('brightskill_user', JSON.stringify(updatedUser));
+        saveStoredUser(updatedUser);
         return updatedUser;
     };
 

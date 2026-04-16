@@ -47,7 +47,7 @@ OFF_TOPIC_HINTS = {
 
 _client = None
 RETRY_ATTEMPTS = 1
-FAB_CACHE_VERSION = "v2"
+FAB_CACHE_VERSION = "v3"
 
 
 def _normalize_model_name(model_name: str) -> str:
@@ -250,7 +250,7 @@ def ask_gemini_with_context(
         response_language=response_language,
     )
     full_prompt = f"{system}\n\nLanguage policy: {language_instruction}\n\nUser message: {query}\nRespond directly."
-    
+
     result = ask_gemini(
         full_prompt,
         max_output_tokens=max_tokens,
@@ -259,6 +259,24 @@ def ask_gemini_with_context(
         response_language=response_language,
     )
     result = sanitize_ai_response(result)
+
+    if _looks_incomplete_response(result):
+        retry_tokens = max(max_tokens * 2, 220)
+        retry_prompt = (
+            f"{full_prompt}\n\n"
+            "Your previous answer was too short or cut off. "
+            "Reply again with a complete answer that finishes naturally and stays specific to the current page context."
+        )
+        retry_result = ask_gemini(
+            retry_prompt,
+            max_output_tokens=retry_tokens,
+            temperature=temperature,
+            source_text=query,
+            response_language=response_language,
+        )
+        retry_result = sanitize_ai_response(retry_result)
+        if retry_result and not _looks_incomplete_response(retry_result):
+            result = retry_result
     
     if (
         use_cache

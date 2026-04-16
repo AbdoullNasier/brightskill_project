@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from books.services import create_book_recommendation
 from courses.models import Course
 from progress.models import ModuleCompletion
-from .services import ask_gemini_with_context
+from .services import ask_gemini_with_context, ask_gemini
 from .models import (
     Conversation,
     Message,
@@ -43,12 +43,13 @@ from .serializers import (
     LearningPathSerializer,
     SELECTABLE_SOFT_SKILLS,
 )
-from .services import ask_gemini
 from .utils import resolve_language
 
-MIN_INTERVIEW_RESPONSES = 5
-MAX_INTERVIEW_RESPONSES = 8
-INTERVIEW_AI_MAX_RETRIES = 3
+MIN_INTERVIEW_RESPONSES = 3
+MAX_INTERVIEW_RESPONSES = 5
+INTERVIEW_AI_MAX_RETRIES = 1
+
+# ADDED MISSING CONSTANTS
 INTERVIEW_DIAGNOSTIC_AREAS = [
     "current level",
     "main challenges",
@@ -57,6 +58,7 @@ INTERVIEW_DIAGNOSTIC_AREAS = [
     "habits",
     "real-life situations",
 ]
+
 INTERVIEW_FALLBACK_PROMPTS = {
     "current level": "How would you describe your current {skill} level in real situations?",
     "main challenges": "What is the hardest part of {skill} for you right now?",
@@ -65,6 +67,7 @@ INTERVIEW_FALLBACK_PROMPTS = {
     "habits": "What habits or routines currently help or hurt your {skill} development?",
     "real-life situations": "Tell me about a recent real-life situation where stronger {skill} would have helped you.",
 }
+
 AI_SERVICE_ERROR_MARKERS = (
     "AI usage limit reached",
     "I could not reach the AI service",
@@ -75,33 +78,7 @@ AI_SERVICE_ERROR_MARKERS = (
     "I’m having trouble reaching the AI right now",
     "I'm having trouble reaching the AI right now",
 )
-# INTERVIEW_AI_MAX_RETRIES = 3
-# INTERVIEW_DIAGNOSTIC_AREAS = [
-#     "current level",
-#     "main challenges",
-#     "goals",
-#     "confidence",
-#     "habits",
-#     "real-life situations",
-# ]
-# INTERVIEW_FALLBACK_PROMPTS = {
-#     "current level": "How would you describe your current {skill} level in real situations?",
-#     "main challenges": "What is the hardest part of {skill} for you right now?",
-#     "goals": "What would success in {skill} look like for you over the next month?",
-#     "confidence": "How confident do you feel using {skill} when the pressure is high?",
-#     "habits": "What habits or routines currently help or hurt your {skill} development?",
-#     "real-life situations": "Tell me about a recent real-life situation where stronger {skill} would have helped you.",
-# }
-# AI_SERVICE_ERROR_MARKERS = (
-#     "AI usage limit reached",
-#     "I could not reach the AI service",
-#     "AI service authentication failed",
-#     "AI model configuration error",
-#     "AI service not configured",
-#     "The AI is busy right now",
-#     "I’m having trouble reaching the AI right now",
-#     "I'm having trouble reaching the AI right now",
-# )
+# ---------------------------------------------
 
 
 class InterviewGenerationError(Exception):
@@ -447,38 +424,6 @@ def _build_fab_retry_prompt(prompt, selected_skill, page, compact_context, respo
         f"User message: {prompt}"
     )
 
-# def _build_roleplay_service_fallback(selected_skill, user_prompt="", compact_mode=False, response_language="en"):
-#     skill = (selected_skill or "communication").strip().lower() or "communication"
-#     clean = str(user_prompt or "").lower()
-#     if any(term in clean for term in ["meeting", "presentation", "speak", "talk"]):
-#         response_core = "open with your main point, give one concrete example"
-#     elif any(term in clean for term in ["conflict", "argument", "disagreement"]):
-#         response_core = "acknowledge the other person, state your view calmly"
-#     elif any(term in clean for term in ["confidence", "nervous", "fear", "anxious"]):
-#         response_core = "slow down, speak clearly, and keep your first sentence simple"
-#     elif any(term in clean for term in ["deadline", "late", "time", "schedule"]):
-#         response_core = "name the priority, commit to one next step, and confirm timing"
-#     else:
-#         response_core = {
-#             "communication": "state one clear point and support it with one example",
-#             "leadership": "set one clear direction and assign one next action",
-#             "emotional intelligence": "name the emotion and respond calmly",
-#             "critical thinking": "define the issue and explain one sound reason",
-#             "time management": "name the priority and protect the next time block",
-#             "adaptability": "acknowledge the change and state one practical adjustment",
-#         }.get(skill, "give one clear response and one practical example")
-#     if response_language == "ha":
-#         return (
-#             f"Mu ci gaba da atisaye a takaice. Ka {response_core}, sannan ka rufe da tambaya daya."
-#             if compact_mode
-#             else f"Ci gaba da atisaye a {skill}: ka {response_core}, sannan ka rufe da tambaya daya."
-#         )
-#     return (
-#         f"Quick practice: {response_core}, then close with one useful question."
-#         if compact_mode
-#         else f"Keep practicing {skill}: {response_core}, then close with one useful question."
-#     )
-
 
 def _infer_covered_diagnostic_areas(transcript):
     covered = set()
@@ -634,7 +579,7 @@ def _generate_roadmap_payload(selected_skill, transcript, response_language="en"
         f"Selected skill: {selected_skill}\n"
         f"Interview transcript: {json.dumps(transcript, ensure_ascii=True)}\n"
     )
-    raw = ask_gemini(prompt, max_output_tokens=2800, temperature=0.25, response_language=response_language)
+    raw = ask_gemini(prompt, max_output_tokens=2000, temperature=0.25, response_language=response_language)
     if any(marker.lower() in str(raw).lower() for marker in AI_SERVICE_ERROR_MARKERS):
         return _build_personalized_roadmap_fallback(selected_skill, transcript)
     payload = _extract_json_payload(raw)
@@ -742,7 +687,7 @@ class FABAssistView(generics.GenericAPIView):
             context=context_enum,
             page_data=compact_context,
             user_id=request.user.id,
-            max_tokens=320,
+            max_tokens=220,
             temperature=0.35,
             use_cache=True,
             response_language=language,
@@ -1033,9 +978,9 @@ class RolePlayStartView(generics.GenericAPIView):
 
         scenario = serializer.validated_data.get("scenario", "").strip()
         if not scenario:
-            scenario = f"Practice {selected_skill or 'soft skills'} in a realistic workplace situation."
+            scenario = f"Practice {selected_skill} in a realistic workplace situation."
 
-        title = f"{(selected_skill or 'soft skills').title()} role-play ({difficulty})"
+        title = f"{selected_skill.title()} role-play ({difficulty})"
         session = RolePlaySession.objects.create(
             user=request.user,
             title=title[:140],
@@ -1046,7 +991,7 @@ class RolePlayStartView(generics.GenericAPIView):
 
         opener_prompt = (
             "You are an AI role-play partner for soft skills practice.\n"
-            f"Selected skill: {selected_skill or 'soft skills (general)'}\n"
+            f"Selected skill: {selected_skill}\n"
             f"Difficulty: {difficulty}\n"
             f"Scenario: {scenario}\n"
             + (
@@ -1057,9 +1002,10 @@ class RolePlayStartView(generics.GenericAPIView):
             )
         )
         language = resolve_language(request.user, scenario)
+        # FIXED: compact_mode -> fewer tokens
         opener = ask_gemini(
             opener_prompt,
-            max_output_tokens=180 if compact_mode else 450,
+            max_output_tokens=150 if compact_mode else 250,
             temperature=0.35,
             response_language=language,
         )
@@ -1127,9 +1073,10 @@ class RolePlayMessageView(generics.GenericAPIView):
                     )
                 )
             )
+            # FIXED: compact_mode -> fewer tokens
             reply = ask_gemini(
                 prompt,
-                max_output_tokens=220 if compact_mode else 700,
+                max_output_tokens=180 if compact_mode else 300,
                 temperature=0.35,
                 response_language=language,
             )
@@ -1225,15 +1172,20 @@ class RolePlayView(generics.GenericAPIView):
         if session_id:
             session = RolePlaySession.objects.filter(id=session_id, user=request.user).first()
         if not session:
-            raw_skill = str(context.get("selected_skill") or "").strip().lower()
-            skill = raw_skill if raw_skill in SELECTABLE_SOFT_SKILLS else ""
+            skill = context.get("selected_skill") or "communication"
             difficulty = context.get("difficulty") or "intermediate"
-            normalized_difficulty = difficulty if difficulty in {"beginner", "intermediate", "advanced"} else "intermediate"
+            start_payload = {
+                "selected_skill": skill if skill in SELECTABLE_SOFT_SKILLS else "communication",
+                "difficulty": difficulty if difficulty in {"beginner", "intermediate", "advanced"} else "intermediate",
+                "scenario": scenario or "",
+            }
+            start_serializer = RolePlayStartSerializer(data=start_payload)
+            start_serializer.is_valid(raise_exception=True)
             session = RolePlaySession.objects.create(
                 user=request.user,
-                title=f"{(skill or 'soft skills').title()} role-play ({normalized_difficulty})"[:140],
-                selected_skill=skill,
-                difficulty=normalized_difficulty,
+                title=f"{start_payload['selected_skill'].title()} role-play ({start_payload['difficulty']})"[:140],
+                selected_skill=start_payload["selected_skill"],
+                difficulty=start_payload["difficulty"],
             )
         language = resolve_language(request.user, prompt)
         if prompt:
@@ -1243,14 +1195,13 @@ class RolePlayView(generics.GenericAPIView):
             history = "\n".join([f"{row.role}: {row.content}" for row in history_rows])
             rp_prompt = (
                 "You are an AI role-play partner.\n"
-                f"Selected skill: {session.selected_skill or 'soft skills (general)'}\n"
+                f"Selected skill: {session.selected_skill}\n"
                 f"Difficulty: {session.difficulty}\n"
                 f"Conversation history:\n{history}\n\n"
                 "Stay fully in character and respond like the other participant in the scenario. "
-                "Keep the practice broad across soft skills unless the user clearly asks to focus on a specific skill. "
                 "Do not give coaching, tips, or feedback unless the user explicitly asks for it."
             )
-            reply = ask_gemini(rp_prompt, max_output_tokens=700, temperature=0.35, response_language=language)
+            reply = ask_gemini(rp_prompt, max_output_tokens=300, temperature=0.35, response_language=language)
             if _is_ai_service_error(reply):
                 print(f"RolePlayView AI error: {reply}")
                 return Response(

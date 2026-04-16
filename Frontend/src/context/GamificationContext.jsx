@@ -1,18 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { apiGet } from '../utils/apiClient';
 
 const GamificationContext = createContext();
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-
-const getAccessToken = () => {
-    try {
-        const raw = localStorage.getItem('brightskill_tokens');
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        return parsed?.access || null;
-    } catch {
-        return null;
-    }
-};
 
 export const GamificationProvider = ({ children }) => {
     const [xp, setXp] = useState(0);
@@ -20,28 +9,15 @@ export const GamificationProvider = ({ children }) => {
     const [badges, setBadges] = useState([]);
 
     const refreshGamification = useCallback(async () => {
-        const access = getAccessToken();
-        if (!access) {
-            setXp(0);
-            setLevel(1);
-            setBadges([]);
-            return;
-        }
-
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/dashboard/`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${access}`,
-                },
-            });
-            if (!response.ok) return;
-            const data = await response.json();
+            const data = await apiGet('/auth/dashboard/');
             setXp(Number(data?.stats?.xp || 0));
             setLevel(Number(data?.stats?.level || 1));
             setBadges(Array.isArray(data?.badges) ? data.badges : []);
         } catch {
-            // Keep existing values when request fails.
+            setXp(0);
+            setLevel(1);
+            setBadges([]);
         }
     }, []);
 

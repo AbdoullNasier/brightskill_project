@@ -1,24 +1,7 @@
 import axios from 'axios';
+import { clearStoredTokens, getStoredTokens, saveStoredTokens } from '../utils/tokenStorage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-
-const getStoredTokens = () => {
-    try {
-        const raw = localStorage.getItem('brightskill_tokens');
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed?.access || parsed?.refresh) return parsed;
-        }
-
-        const legacyAccess = localStorage.getItem('access');
-        if (legacyAccess) {
-            return { access: legacyAccess, refresh: null };
-        }
-    } catch {
-        return null;
-    }
-    return null;
-};
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -62,10 +45,11 @@ api.interceptors.response.use(
             });
 
             const nextTokens = { ...tokens, access: refreshResponse.data.access };
-            localStorage.setItem('brightskill_tokens', JSON.stringify(nextTokens));
+            saveStoredTokens(nextTokens);
             originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.access}`;
             return api(originalRequest);
         } catch {
+            clearStoredTokens();
             return Promise.reject(new Error('Session expired. Please login again.'));
         }
     }

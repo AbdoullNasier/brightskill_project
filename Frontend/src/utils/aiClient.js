@@ -1,29 +1,6 @@
+import { clearStoredTokens, getStoredTokens, saveStoredTokens } from './tokenStorage';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-
-const getStoredTokens = () => {
-    try {
-        const raw = localStorage.getItem('brightskill_tokens');
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed?.access || parsed?.refresh) return parsed;
-        }
-
-        // Backward compatibility with older token storage keys.
-        const legacyAccess = localStorage.getItem('access_token');
-        const legacyRefresh = localStorage.getItem('refresh_token');
-        if (legacyAccess || legacyRefresh) {
-            return { access: legacyAccess, refresh: legacyRefresh };
-        }
-
-        return null;
-    } catch {
-        return null;
-    }
-};
-
-const saveStoredTokens = (tokens) => {
-    localStorage.setItem('brightskill_tokens', JSON.stringify(tokens));
-};
 
 const refreshAccessToken = async () => {
     const tokens = getStoredTokens();
@@ -36,10 +13,16 @@ const refreshAccessToken = async () => {
         body: JSON.stringify({ refresh }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+        clearStoredTokens();
+        return null;
+    }
 
     const data = await response.json();
-    if (!data?.access) return null;
+    if (!data?.access) {
+        clearStoredTokens();
+        return null;
+    }
 
     const nextTokens = { ...tokens, access: data.access };
     saveStoredTokens(nextTokens);
