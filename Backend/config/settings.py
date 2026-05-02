@@ -14,7 +14,7 @@ load_dotenv(BASE_DIR / ".env", override=True)
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 DEBUG = os.environ.get("DEBUG", "False") == "True"
-ALLOWED_HOSTS = ['.onrender.com']
+ALLOWED_HOSTS = ['brightskillapp.onrender.com']
 
 INSTALLED_APPS = [
     "django.contrib.admin",
