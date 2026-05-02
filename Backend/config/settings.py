@@ -11,14 +11,10 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env", override=True)
 
-SECRET_KEY = config(
-    "SECRET_KEY",
-    default="django-insecure-brightskill-development-key-please-change-this-1234567890",
-)
-DEBUG = config("DEBUG", default=False, cast=bool)
-ALLOWED_HOSTS = config(
-    "ALLOWED_HOSTS", default=".onrender.com", cast=Csv(),
-)
+SECRET_KEY = os.environ.get("SECRET_KEY")
+
+DEBUG = os.environ.get("DEBUG", "False") == "True"
+ALLOWED_HOSTS = ['.onrender.com']
 
 INSTALLED_APPS = [
     "django.contrib.admin",
