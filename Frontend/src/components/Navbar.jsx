@@ -1,7 +1,7 @@
 ﻿import React, { useState } from 'react';
 import logo from '../assets/Images/logo1.png';
 import { Link, useLocation } from 'react-router-dom';
-import { MdMenu, MdClose, MdLanguage, MdStar, MdFlashOn } from 'react-icons/md';
+import { MdMenu, MdClose, MdLanguage } from 'react-icons/md';
 import { useLanguage } from '../context/LanguageContext';
 import { useGamification } from '../context/GamificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +10,7 @@ import Button from './Button';
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
     const { language, toggleLanguage, t } = useLanguage();
-    const { xp, level, progressToNextLevel } = useGamification();
+    const { level } = useGamification();
     const { user, isAuthenticated, logout } = useAuth(); // Use real auth context
     const location = useLocation();
 
@@ -54,23 +54,28 @@ const Navbar = () => {
 
     const isActive = (path) => location.pathname === path;
 
-    const AuthButtons = () => {
+    const handleLogout = () => {
+        logout();
+        setIsOpen(false);
+    };
+
+    const renderAuthButtons = () => {
         if (!isAuthenticated) {
             return (
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3">
                     <Link to="/login">
                         <Button variant="ghost" className="!px-4">{t('nav.login')}</Button>
                     </Link>
                     <Link to="/register">
-                        <Button className="!px-4 text-sm">{t('nav.signup')}</Button>
+                        <Button className="!px-4 text-sm whitespace-nowrap">{t('nav.signup')}</Button>
                     </Link>
                 </div>
             );
         }
 
         return (
-            <div className="flex items-center space-x-4">
-                <div className="hidden md:flex flex-col items-end mr-2">
+            <div className="flex items-center gap-3">
+                <div className="hidden xl:flex flex-col items-end mr-1">
                     <span className="text-sm font-bold text-gray-700">{user?.first_name || user?.username} <span className="text-gray-500 font-normal">({user?.username})</span></span>
                     {user?.role === 'learner' && <span className="text-xs text-primary">Lvl {level}</span>}
                 </div>
@@ -79,7 +84,7 @@ const Navbar = () => {
                     alt="Profile"
                     className="h-10 w-10 rounded-full border border-gray-200"
                 />
-                <Button onClick={logout} variant="outline" className="!px-3 text-sm">{t('nav.logout')}</Button>
+                <Button onClick={handleLogout} variant="outline" className="!px-3 text-sm">{t('nav.logout')}</Button>
             </div>
         );
     };
@@ -105,7 +110,7 @@ const Navbar = () => {
                     </Link>
 
                     {/* Desktop Menu */}
-                    <div className="hidden md:flex items-center space-x-14">
+                    <div className="hidden lg:flex items-center gap-6 xl:gap-10">
                         {navLinks.map((link) => (
                             <Link
                                 key={link.path}
@@ -120,30 +125,31 @@ const Navbar = () => {
                         ))}
                     </div>
 
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center gap-4">
 
                         {/* Language Toggle */}
                         <button
+                            type="button"
                             onClick={toggleLanguage}
-                            className="hidden md:flex items-center space-x-1 text-gray-600 hover:text-primary transition-colors"
+                            className="hidden lg:flex items-center gap-1 text-gray-600 hover:text-primary transition-colors"
+                            aria-label="Toggle language"
                         >
                             <MdLanguage size={20} />
                             <span className="font-bold">{language}</span>
                         </button>
 
-                        <AuthButtons />
+                        <div className="hidden lg:block">
+                            {renderAuthButtons()}
+                        </div>
 
                         {/* Mobile Menu Button */}
-                        <div className="md:hidden flex items-center">
+                        <div className="lg:hidden flex items-center">
                             <button
-                                onClick={toggleLanguage}
-                                className="mr-4 flex items-center space-x-1 text-gray-600"
-                            >
-                                <span className="font-bold">{language}</span>
-                            </button>
-                            <button
+                                type="button"
                                 onClick={() => setIsOpen(!isOpen)}
-                                className="text-gray-600 hover:text-primary focus:outline-none"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                                aria-expanded={isOpen}
                             >
                                 {isOpen ? <MdClose size={24} /> : <MdMenu size={24} />}
                             </button>
@@ -153,12 +159,12 @@ const Navbar = () => {
 
                 {/* Mobile Menu Dropdown */}
                 {isOpen && (
-                    <div className="md:hidden absolute top-16 left-0 w-full bg-white border-b border-gray-100 shadow-lg animate-fade-in-down">
-                        <div className="px-4 pt-2 pb-6 space-y-2">
+                    <div className="lg:hidden absolute top-16 left-0 w-full bg-white border-b border-gray-100 shadow-lg animate-fade-in-down">
+                        <div className="mx-auto max-w-7xl px-4 pt-3 pb-6 space-y-2">
                             {isAuthenticated && (
                                 <div className="flex items-center p-3 mb-2 bg-gray-50 rounded-lg">
                                     <img
-                                        src={user?.avatar}
+                                        src={user?.avatar || 'https://via.placeholder.com/40'}
                                         alt="Profile"
                                         className="h-10 w-10 rounded-full border border-gray-200 mr-3"
                                     />
@@ -183,18 +189,30 @@ const Navbar = () => {
                                 </Link>
                             ))}
 
+                            <button
+                                type="button"
+                                onClick={toggleLanguage}
+                                className="flex w-full items-center justify-between rounded-md px-3 py-2 text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-primary"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <MdLanguage size={20} />
+                                    Language
+                                </span>
+                                <span className="font-bold">{language}</span>
+                            </button>
+
                             {!isAuthenticated ? (
                                 <div className="pt-4 space-y-2 border-t border-gray-100 mt-4">
                                     <Link to="/login" onClick={() => setIsOpen(false)} className="block w-full">
-                                        <Button variant="ghost" className="w-full text-left">{t('nav.login')}</Button>
+                                        <Button variant="ghost" className="flex w-full justify-center">{t('nav.login')}</Button>
                                     </Link>
                                     <Link to="/register" onClick={() => setIsOpen(false)} className="block w-full">
-                                        <Button className="w-full">{t('nav.signup')}</Button>
+                                        <Button className="flex w-full justify-center">{t('nav.signup')}</Button>
                                     </Link>
                                 </div>
                             ) : (
                                 <div className="pt-4 border-t border-gray-100 mt-4">
-                                    <Button onClick={() => { logout(); setIsOpen(false); }} variant="outline" className="w-full text-left">{t('nav.logout')}</Button>
+                                    <Button onClick={handleLogout} variant="outline" className="flex w-full justify-center">{t('nav.logout')}</Button>
                                 </div>
                             )}
                         </div>
