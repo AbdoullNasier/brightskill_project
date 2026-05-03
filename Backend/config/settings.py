@@ -17,13 +17,13 @@ DEBUG = os.environ.get("DEBUG", "False") == "True"
 ALLOWED_HOSTS = ['brightskillapp.onrender.com']
 
 INSTALLED_APPS = [
+    "corsheaders",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
     "accounts",
@@ -159,6 +159,8 @@ CORS_ALLOWED_ORIGINS = config(
     default="https://brightskill.vercel.app",
     cast=Csv(),
 )
+
+CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "https://brightskill.vercel.app",
