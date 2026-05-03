@@ -156,7 +156,7 @@ CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL_ORIGINS", default=False, cast=bo
 
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
-    default="https://your-brightskill.vercel.app",
+    default="https://brightskill.vercel.app",
     cast=Csv(),
 )
 
