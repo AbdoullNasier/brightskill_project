@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import { MdArrowBack, MdQuiz, MdCheckCircle } from 'react-icons/md';
+import { MdArrowBack, MdQuiz, MdCheckCircle, MdCancel } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
 import QuizModal from '../components/QuizModal';
 import { getCourseModules, getQuizzes } from '../services/courseService';
@@ -367,7 +367,11 @@ const LessonView = () => {
                         ? 'bg-red-50 border-red-200'
                         : 'bg-green-50 border-green-200'
                 }`}>
-                    <MdCheckCircle className={`text-5xl mb-4 ${resultStatus === 'error' ? 'text-red-500' : 'text-green-500'}`} />
+                    {resultStatus === 'error' ? (
+                        <MdCancel className="text-5xl mb-4 text-red-500" />
+                    ) : (
+                        <MdCheckCircle className="text-5xl mb-4 text-green-500" />
+                    )}
                     <h2 className={`text-2xl font-bold ${resultStatus === 'error' ? 'text-red-800' : 'text-green-800'}`}>{resultMsg}</h2>
                     {resultDetail && (
                         <p className={`text-sm mt-3 text-center ${resultStatus === 'error' ? 'text-red-900' : 'text-green-900'}`}>
