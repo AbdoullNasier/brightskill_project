@@ -38,7 +38,7 @@ const CareerAssessmentModal = ({ isOpen, onClose }) => {
     }, [isOpen]);
 
     const currentQuestion = questions[step];
-    const progress = Math.max(8, Math.min(Math.round(((step + 1) / 8) * 100), 100));
+    const progress = Math.max(8, Math.min(Math.round(((step + 1) / 7) * 100), 100));
 
     const startInterview = async () => {
         if (!selectedSkill) {
@@ -54,7 +54,12 @@ const CareerAssessmentModal = ({ isOpen, onClose }) => {
                 throw new Error('Failed to start skill interview.');
             }
             setAssessmentId(data.assessment_id);
-            setQuestions([{ title: firstQuestion }]);
+            setQuestions([{
+                title: firstQuestion,
+                questionKey: data.question_key || data.question_object?.question_key || '',
+                type: data.question_type || data.question_object?.question_type || 'text',
+                options: data.options || data.question_object?.options || [],
+            }]);
             setResponses(['']);
             setStep(0);
             setView('interview');
@@ -79,6 +84,7 @@ const CareerAssessmentModal = ({ isOpen, onClose }) => {
             const answerData = await postAI('/interview/answer/', {
                 assessment_id: assessmentId,
                 question_text: currentQuestion.title,
+                question_key: currentQuestion.questionKey || '',
                 response_text: responseText,
             });
 
@@ -94,7 +100,12 @@ const CareerAssessmentModal = ({ isOpen, onClose }) => {
             if (!nextQuestion) {
                 throw new Error('Invalid follow-up question from server.');
             }
-            setQuestions((prev) => [...prev, { title: nextQuestion }]);
+            setQuestions((prev) => [...prev, {
+                title: nextQuestion,
+                questionKey: answerData.next_question_key || answerData.question_object?.question_key || '',
+                type: answerData.next_question_type || answerData.question_object?.question_type || 'text',
+                options: answerData.options || answerData.question_object?.options || [],
+            }]);
             setResponses((prev) => [...prev, '']);
             setStep((prev) => prev + 1);
         } catch (err) {
@@ -179,19 +190,44 @@ const CareerAssessmentModal = ({ isOpen, onClose }) => {
 
                             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex-1">
                                 <h3 className="text-lg font-bold text-gray-900 mb-4">{currentQuestion.title}</h3>
-                                <textarea
-                                    rows="5"
-                                    value={responses[step] || ''}
-                                    onChange={(e) =>
-                                        setResponses((prev) => {
-                                            const next = [...prev];
-                                            next[step] = e.target.value;
-                                            return next;
-                                        })
-                                    }
-                                    placeholder="Type your answer..."
-                                    className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                />
+                                {currentQuestion.type === 'mcq' && currentQuestion.options?.length ? (
+                                    <div className="grid gap-3">
+                                        {currentQuestion.options.map((option) => (
+                                            <button
+                                                key={option}
+                                                type="button"
+                                                onClick={() =>
+                                                    setResponses((prev) => {
+                                                        const next = [...prev];
+                                                        next[step] = option;
+                                                        return next;
+                                                    })
+                                                }
+                                                className={`rounded-xl border px-4 py-3 text-left font-semibold transition ${
+                                                    responses[step] === option
+                                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                                        : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-300 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {option}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <textarea
+                                        rows="5"
+                                        value={responses[step] || ''}
+                                        onChange={(e) =>
+                                            setResponses((prev) => {
+                                                const next = [...prev];
+                                                next[step] = e.target.value;
+                                                return next;
+                                            })
+                                        }
+                                        placeholder="Type your answer..."
+                                        className="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    />
+                                )}
                                 {error && <p className="text-sm text-red-600 mt-4">{error}</p>}
                             </div>
 

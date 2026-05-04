@@ -45,11 +45,89 @@ from .serializers import (
 )
 from .utils import resolve_language
 
-MIN_INTERVIEW_RESPONSES = 3
-MAX_INTERVIEW_RESPONSES = 5
+MIN_INTERVIEW_RESPONSES = 4
+MAX_AI_INTERVIEW_QUESTIONS = 3
+MAX_INTERVIEW_RESPONSES = MIN_INTERVIEW_RESPONSES + MAX_AI_INTERVIEW_QUESTIONS
 INTERVIEW_AI_MAX_RETRIES = 1
 
-# ADDED MISSING CONSTANTS
+INITIAL_QUESTIONS_BY_SKILL = {
+    "communication": [
+        {"type": "text", "question_key": "goal", "question_text": "What is your main goal in improving communication?"},
+        {"type": "text", "question_key": "challenge", "question_text": "Where do you struggle most in communication?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Rate your confidence level.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Describe a recent communication situation that did not go well."},
+    ],
+    "leadership": [
+        {"type": "text", "question_key": "goal", "question_text": "What is your main goal in improving leadership?"},
+        {"type": "text", "question_key": "challenge", "question_text": "Where do you struggle most when leading others?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Rate your confidence level as a leader.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Describe a recent leadership situation that did not go well."},
+    ],
+    "emotional intelligence": [
+        {"type": "text", "question_key": "goal", "question_text": "What is your main goal in improving emotional intelligence?"},
+        {"type": "text", "question_key": "challenge", "question_text": "Where do you struggle most with understanding or managing emotions?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Rate your emotional intelligence confidence level.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Describe a recent situation where emotions affected the outcome."},
+    ],
+    "critical thinking": [
+        {"type": "text", "question_key": "goal", "question_text": "What is your main goal in improving critical thinking?"},
+        {"type": "text", "question_key": "challenge", "question_text": "Where do you struggle most when analyzing problems or making decisions?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Rate your critical thinking confidence level.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Describe a recent decision or problem that did not go well."},
+    ],
+    "time management": [
+        {"type": "text", "question_key": "goal", "question_text": "What is your main goal in improving time management?"},
+        {"type": "text", "question_key": "challenge", "question_text": "Where do you struggle most with managing your time?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Rate your time management confidence level.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Describe a recent situation where poor time management affected your result."},
+    ],
+    "adaptability": [
+        {"type": "text", "question_key": "goal", "question_text": "What is your main goal in improving adaptability?"},
+        {"type": "text", "question_key": "challenge", "question_text": "Where do you struggle most when plans or situations change?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Rate your adaptability confidence level.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Describe a recent change or unexpected situation that did not go well."},
+    ],
+}
+
+INITIAL_QUESTIONS_BY_SKILL_HA = {
+    "communication": [
+        {"type": "text", "question_key": "goal", "question_text": "Menene babban burinka wajen inganta sadarwa?"},
+        {"type": "text", "question_key": "challenge", "question_text": "A wane bangare ne ka fi samun matsala wajen sadarwa?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Ka kimanta matakin kwarin gwiwarka.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Ka bayyana wani yanayin sadarwa na baya-bayan nan da bai tafi yadda ya kamata ba."},
+    ],
+    "leadership": [
+        {"type": "text", "question_key": "goal", "question_text": "Menene babban burinka wajen inganta jagoranci?"},
+        {"type": "text", "question_key": "challenge", "question_text": "A wane bangare ne ka fi samun matsala idan kana jagorantar wasu?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Ka kimanta kwarin gwiwarka a matsayin jagora.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Ka bayyana wani yanayin jagoranci na baya-bayan nan da bai tafi yadda ya kamata ba."},
+    ],
+    "emotional intelligence": [
+        {"type": "text", "question_key": "goal", "question_text": "Menene babban burinka wajen inganta fahimtar motsin rai?"},
+        {"type": "text", "question_key": "challenge", "question_text": "A ina kake fi samun matsala wajen fahimta ko sarrafa motsin rai?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Ka kimanta kwarin gwiwarka a fahimtar motsin rai.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Ka bayyana wani yanayi na baya-bayan nan inda motsin rai ya shafi sakamako."},
+    ],
+    "critical thinking": [
+        {"type": "text", "question_key": "goal", "question_text": "Menene babban burinka wajen inganta tunani mai zurfi?"},
+        {"type": "text", "question_key": "challenge", "question_text": "A ina kake fi samun matsala wajen nazarin matsala ko yanke shawara?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Ka kimanta kwarin gwiwarka a tunani mai zurfi.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Ka bayyana wata shawara ko matsala ta baya-bayan nan da ba ta tafi yadda ya kamata ba."},
+    ],
+    "time management": [
+        {"type": "text", "question_key": "goal", "question_text": "Menene babban burinka wajen inganta sarrafa lokaci?"},
+        {"type": "text", "question_key": "challenge", "question_text": "A ina kake fi samun matsala wajen sarrafa lokacinka?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Ka kimanta kwarin gwiwarka wajen sarrafa lokaci.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Ka bayyana wani yanayi na baya-bayan nan inda rashin sarrafa lokaci ya shafi sakamakonka."},
+    ],
+    "adaptability": [
+        {"type": "text", "question_key": "goal", "question_text": "Menene babban burinka wajen inganta iya daidaitawa da canji?"},
+        {"type": "text", "question_key": "challenge", "question_text": "A ina kake fi samun matsala idan tsari ko yanayi ya canza?"},
+        {"type": "mcq", "question_key": "confidence", "question_text": "Ka kimanta kwarin gwiwarka wajen daidaitawa da canji.", "options": ["1-3", "4-6", "7-10"]},
+        {"type": "text", "question_key": "real_situation", "question_text": "Ka bayyana wani canji ko yanayi na bazata da bai tafi yadda ya kamata ba."},
+    ],
+}
+
 INTERVIEW_DIAGNOSTIC_AREAS = [
     "current level",
     "main challenges",
@@ -74,6 +152,7 @@ AI_SERVICE_ERROR_MARKERS = (
     "AI service authentication failed",
     "AI model configuration error",
     "AI service not configured",
+    "AI service is not authorized",
     "The AI is busy right now",
     "I’m having trouble reaching the AI right now",
     "I'm having trouble reaching the AI right now",
@@ -151,10 +230,82 @@ def _normalize_question_text(value):
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
 
 
+def _normalize_selected_skill(selected_skill):
+    clean = re.sub(r"\s+", " ", str(selected_skill or "").strip().lower())
+    return clean if clean in INITIAL_QUESTIONS_BY_SKILL else "communication"
+
+
+def _normalize_interview_language(language):
+    return "ha" if str(language or "").strip().lower() == "ha" else "en"
+
+
+def _interview_language_name(language):
+    return "Hausa" if _normalize_interview_language(language) == "ha" else "English"
+
+
+def _initial_questions_for_skill(selected_skill, language="en"):
+    skill = _normalize_selected_skill(selected_skill)
+    source = INITIAL_QUESTIONS_BY_SKILL_HA if _normalize_interview_language(language) == "ha" else INITIAL_QUESTIONS_BY_SKILL
+    return [dict(question) for question in source.get(skill, source["communication"])]
+
+
+def _serialize_interview_question(question):
+    if not question:
+        return {}
+    return {
+        "question_key": str(question.get("question_key", "")).strip(),
+        "question": str(question.get("question_text", "")).strip(),
+        "question_text": str(question.get("question_text", "")).strip(),
+        "question_type": str(question.get("type", "text")).strip() or "text",
+        "options": list(question.get("options", []) or []),
+    }
+
+
+def _slug_question_key(value, prefix="ai"):
+    clean = _normalize_question_text(value)
+    if not clean:
+        return prefix
+    return f"{prefix}_{'_'.join(clean.split()[:8])}"[:100]
+
+
+def _question_key_from_text(selected_skill, language, question_text):
+    normalized = _normalize_question_text(question_text)
+    for question in _initial_questions_for_skill(selected_skill, language):
+        if _normalize_question_text(question["question_text"]) == normalized:
+            return question["question_key"]
+    return _slug_question_key(question_text)
+
+
+def _next_structured_question(assessment):
+    selected_skill = _normalize_selected_skill(assessment.selected_skill)
+    language = _normalize_interview_language(assessment.interview_language)
+    answered_keys = set(
+        assessment.responses.exclude(question_key="")
+        .values_list("question_key", flat=True)
+    )
+    answered_texts = {
+        _normalize_question_text(text)
+        for text in assessment.responses.values_list("question_text", flat=True)
+    }
+
+    for question in _initial_questions_for_skill(selected_skill, language):
+        if question["question_key"] in answered_keys:
+            continue
+        if _normalize_question_text(question["question_text"]) in answered_texts:
+            continue
+        return question
+    return None
+
+
+def _ai_question_count(assessment):
+    return assessment.responses.filter(question_key__startswith="ai_").count()
+
+
 def _build_interview_transcript(assessment):
     return [
         {
             "sequence_order": item.sequence_order,
+            "question_key": item.question_key,
             "question_text": item.question_text,
             "response_text": item.response_text,
         }
@@ -180,10 +331,65 @@ def _extract_question_from_raw_text(raw_text):
     return ""
 
 
-def _build_personalized_roadmap_fallback(selected_skill, transcript):
+def _build_personalized_roadmap_fallback(selected_skill, transcript, response_language="en"):
+    language = _normalize_interview_language(response_language)
     responses = [row.get("response_text", "").strip() for row in transcript if row.get("response_text")]
     latest_response = responses[-1] if responses else ""
     first_response = responses[0] if responses else ""
+
+    if language == "ha":
+        summary = (
+            f"Wannan taswirar koyo tana taimaka maka ka inganta {selected_skill} ta hanyar atisaye, tunani, da amfani a rayuwa ta yau da kullum."
+        )
+        if first_response or latest_response:
+            summary = (
+                f"Wannan taswirar koyo ta dogara da amsoshinka game da {selected_skill}, "
+                "tare da mai da hankali kan abin da kake so ka inganta, kalubale, da atisaye mai ma'ana."
+            )
+
+        stages = [
+            {
+                "stage_title": "Fahimtar Matsayinka",
+                "stage_objective": f"Fahimci karfinka, raunin ka, da abubuwan da ke hana ci gaba a {selected_skill}.",
+                "learner_actions": f"Ka rubuta yanayi uku da suka nuna yadda kake amfani da {selected_skill} a yanzu.",
+                "practical_exercise": f"Ka yi tunani bayan wani yanayi na {selected_skill} a wannan makon.",
+                "habit_action": "Ka ware minti 10 a kowace rana domin nazarin abin da ya faru da abin da za ka gyara.",
+                "course_hint": selected_skill,
+                "ai_support_note": "Tambayi FAB ya mayar da tunaninka zuwa jerin ayyukan mako.",
+            },
+            {
+                "stage_title": "Atisaye Mai Jagora",
+                "stage_objective": f"Ka fara amfani da {selected_skill} a kananan yanayi masu sauki.",
+                "learner_actions": f"Ka zabi yanayi biyu a mako inda za ka yi atisaye da {selected_skill}.",
+                "practical_exercise": f"Ka yi role-play guda biyu da suka shafi {selected_skill}.",
+                "habit_action": "Ka rubuta abin da ka shirya, abin da ka yi, da abin da ya sauya.",
+                "course_hint": selected_skill,
+                "ai_support_note": "Tambayi FAB ya baka drills da suka dace da matakinka.",
+            },
+            {
+                "stage_title": "Amfani a Rayuwa",
+                "stage_objective": f"Ka yi amfani da {selected_skill} a muhimman yanayi na gaskiya.",
+                "learner_actions": "Ka yi amfani da dabara daya a tattaunawa, aiki, ko wani yanayi mai muhimmanci kowane mako.",
+                "practical_exercise": "Ka rubuta misali daya a mako sannan ka tantance abin da ya inganta.",
+                "habit_action": "Ka nemi gajeren feedback daga mutum daya da ka yarda da shi.",
+                "course_hint": selected_skill,
+                "ai_support_note": "Tambayi FAB ya duba misalinka ya bada shawarar mataki na gaba.",
+            },
+            {
+                "stage_title": "Dorewa da Ci Gaba",
+                "stage_objective": f"Ka gina dabi'u masu dorewa domin samun cigaba a {selected_skill}.",
+                "learner_actions": "Ka sa burin mako daya, ka duba cigaba, sannan ka gyara tsarin idan ya dace.",
+                "practical_exercise": "Ka maimaita wani yanayi mai muhimmanci ka kwatanta sakamakonka.",
+                "habit_action": "Ka yi bitar mako: nasara, matsala, da abin da za ka fi maida hankali a kai.",
+                "course_hint": selected_skill,
+                "ai_support_note": "Tambayi FAB ya baka shawarwarin mataki na gaba bisa cigabanka.",
+            },
+        ]
+        return {
+            "title": f"Taswirar Kwarewa a {selected_skill.title()}",
+            "summary": summary,
+            "stages": stages,
+        }
 
     summary = (
         f"This roadmap focuses on improving {selected_skill} through structured practice, reflection, and real-world application."
@@ -462,8 +668,10 @@ def _build_fallback_interview_question(selected_skill, transcript):
     return f"What is one specific {selected_skill} situation you want to handle better next?"
 
 
-def _build_interview_generation_prompt(selected_skill, transcript, attempt_number):
+def _build_interview_generation_prompt(selected_skill, transcript, interview_language, attempt_number):
     asked_questions = [row["question_text"] for row in transcript]
+    asked_keys = [row.get("question_key", "") for row in transcript if row.get("question_key")]
+    language_name = _interview_language_name(interview_language)
     attempt_instruction = ""
     if attempt_number > 1:
         attempt_instruction = (
@@ -472,47 +680,54 @@ def _build_interview_generation_prompt(selected_skill, transcript, attempt_numbe
         )
 
     return (
-        "You are a precise AI interviewer for BrightSkill, a soft-skills learning platform.\n"
-        "Your job is to run a dynamic interview for exactly one selected skill and decide whether another question is needed.\n"
+        "You are a precise diagnostic interviewer for BrightSkill, a soft-skills learning platform.\n"
+        "The structured base interview is already complete. Your job is to ask one controlled follow-up question only when it adds diagnostic value.\n"
         "Return JSON only with this schema:\n"
         '{'
         '"is_complete": false,'
+        '"question_key": "ai_specific_short_key",'
         '"question_text": "...",'
-        '"completion_reason": "...",'
-        '"coverage_summary": ["..."]'
+        '"completion_reason": ""'
         "}\n"
         "Rules:\n"
         "- Stay strictly focused on the selected skill.\n"
-        "- Ask exactly one question when is_complete is false.\n"
-        "- The question must be concise, natural, and specific.\n"
+        "- Ask exactly ONE question when is_complete is false.\n"
+        "- The question must be practical, diagnostic, concise, and specific to the learner's previous answers.\n"
         "- Do not ask multi-part or compound questions.\n"
         "- Do not repeat or paraphrase any earlier question.\n"
-        "- Use the transcript to probe missing information about current level, main challenges, goals, confidence, habits, and real-life situations.\n"
-        "- Set is_complete to true only when enough information exists to build a personalized learning path for the selected skill.\n"
+        "- Do not reuse any earlier question_key.\n"
+        "- Probe only missing information about current level, goals, challenges, confidence, habits, real situations, blockers, or preferred practice style.\n"
+        "- Stay within soft skills and the selected skill only.\n"
+        f"- Write the entire question in {language_name} only. Do not mix Hausa and English.\n"
+        "- If enough information exists, set is_complete to true.\n"
         "- When is_complete is true, leave question_text as an empty string and explain why in completion_reason.\n"
         "- Do not mention JSON, schemas, or internal reasoning.\n"
         f"{attempt_instruction}\n\n"
         f"Selected skill: {selected_skill}\n"
+        f"Interview language: {language_name}\n"
         f"Diagnostic areas to cover: {INTERVIEW_DIAGNOSTIC_AREAS}\n"
-        f"Questions already asked: {json.dumps(asked_questions, ensure_ascii=True)}\n"
-        f"Transcript so far: {json.dumps(transcript, ensure_ascii=True)}"
+        f"Question keys already used: {json.dumps(asked_keys, ensure_ascii=False)}\n"
+        f"Questions already asked: {json.dumps(asked_questions, ensure_ascii=False)}\n"
+        f"Transcript so far: {json.dumps(transcript, ensure_ascii=False)}"
     )
 
 
-def _request_dynamic_interview_turn(selected_skill, transcript, response_language="en"):
+def _generate_next_interview_question(selected_skill, transcript, interview_language="en"):
     response_count = len(transcript)
     if response_count >= MAX_INTERVIEW_RESPONSES:
         return {"is_complete": True, "completion_reason": "Maximum interview length reached."}
 
     asked_normalized = {_normalize_question_text(row["question_text"]) for row in transcript}
+    asked_keys = {str(row.get("question_key", "")).strip() for row in transcript if row.get("question_key")}
+    language = _normalize_interview_language(interview_language)
 
     for attempt in range(1, INTERVIEW_AI_MAX_RETRIES + 1):
-        prompt = _build_interview_generation_prompt(selected_skill, transcript, attempt)
+        prompt = _build_interview_generation_prompt(selected_skill, transcript, language, attempt)
         raw = ask_gemini(
             prompt,
             max_output_tokens=200,
             temperature=0.15,
-            response_language=response_language,
+            response_language=language,
         )
         payload = _extract_json_payload(raw)
         if not payload:
@@ -524,7 +739,9 @@ def _request_dynamic_interview_turn(selected_skill, transcript, response_languag
                 and normalized_plain_question not in asked_normalized
                 and plain_question.count("?") <= 1
             ):
-                return {"is_complete": False, "question_text": plain_question}
+                question_key = _slug_question_key(plain_question)
+                if question_key not in asked_keys:
+                    return {"is_complete": False, "question_key": question_key, "question_text": plain_question}
             continue
 
         is_complete = bool(payload.get("is_complete", False))
@@ -537,23 +754,34 @@ def _request_dynamic_interview_turn(selected_skill, transcript, response_languag
                 or "Sufficient information collected for a personalized learning path.",
             }
 
+        question_key = str(payload.get("question_key", "")).strip() or _slug_question_key(payload.get("question_text", ""))
+        question_key = _slug_question_key(question_key, prefix="ai") if not question_key.startswith("ai_") else question_key[:100]
         question_text = str(payload.get("question_text", "")).strip()
         normalized_question = _normalize_question_text(question_text)
         if not question_text or not normalized_question:
             continue
         if normalized_question in asked_normalized:
             continue
+        if question_key in asked_keys:
+            continue
         if question_text.count("?") > 1:
             continue
 
-        return {"is_complete": False, "question_text": question_text}
+        return {"is_complete": False, "question_key": question_key, "question_text": question_text}
 
     if response_count >= MIN_INTERVIEW_RESPONSES:
         return {"is_complete": True, "completion_reason": "Sufficient information collected for a personalized learning path."}
-    return {"is_complete": False, "question_text": _build_fallback_interview_question(selected_skill, transcript)}
+    fallback_question = _build_fallback_interview_question(selected_skill, transcript)
+    return {"is_complete": False, "question_key": _slug_question_key(fallback_question), "question_text": fallback_question}
+
+
+def _request_dynamic_interview_turn(selected_skill, transcript, response_language="en"):
+    return _generate_next_interview_question(selected_skill, transcript, response_language)
 
 
 def _generate_roadmap_payload(selected_skill, transcript, response_language="en"):
+    language = _normalize_interview_language(response_language)
+    language_name = _interview_language_name(language)
     prompt = (
         "You are an expert soft-skills coach for BrightSkill.\n"
         "Build a practical, personalized, multi-stage learning roadmap for exactly one selected soft skill.\n"
@@ -575,13 +803,16 @@ def _generate_roadmap_payload(selected_skill, transcript, response_language="en"
         "- Provide 4 to 6 stages.\n"
         "- Keep every stage tied to the selected skill only.\n"
         "- Use the interview transcript to personalize the roadmap around the learner's level, goals, blockers, confidence, habits, and real-life situations.\n"
-        "- Make actions concrete and executable.\n\n"
+        "- Make actions concrete and executable.\n"
+        f"- Write every user-facing value in {language_name} only. Do not mix Hausa and English.\n"
+        "- Keep JSON keys exactly in English as specified, but translate the values according to the interview language.\n\n"
         f"Selected skill: {selected_skill}\n"
-        f"Interview transcript: {json.dumps(transcript, ensure_ascii=True)}\n"
+        f"Interview language: {language_name}\n"
+        f"Interview transcript: {json.dumps(transcript, ensure_ascii=False)}\n"
     )
-    raw = ask_gemini(prompt, max_output_tokens=2000, temperature=0.25, response_language=response_language)
+    raw = ask_gemini(prompt, max_output_tokens=2000, temperature=0.25, response_language=language)
     if any(marker.lower() in str(raw).lower() for marker in AI_SERVICE_ERROR_MARKERS):
-        return _build_personalized_roadmap_fallback(selected_skill, transcript)
+        return _build_personalized_roadmap_fallback(selected_skill, transcript, response_language=language)
     payload = _extract_json_payload(raw)
 
     title = str(payload.get("title", "")).strip() or f"{selected_skill.title()} Mastery Roadmap"
@@ -589,6 +820,8 @@ def _generate_roadmap_payload(selected_skill, transcript, response_language="en"
     stages = payload.get("stages", [])
 
     if not isinstance(stages, list) or len(stages) < 3:
+        if language == "ha":
+            return _build_personalized_roadmap_fallback(selected_skill, transcript, response_language=language)
         stages = [
             {
                 "stage_title": "Foundation",
@@ -718,16 +951,20 @@ class OnboardingSelectSkillView(generics.GenericAPIView):
             serializer.is_valid(raise_exception=True)
 
             selected_skill = serializer.validated_data["selected_skill"]
+            interview_language = resolve_language(request.user)
             UserSkillProfile.objects.update_or_create(
                 user=request.user,
                 defaults={"selected_skill": selected_skill, "current_stage_index": 1},
             )
-            assessment = InterviewAssessment.objects.create(user=request.user, selected_skill=selected_skill, is_completed=False)
-            first_turn = _request_dynamic_interview_turn(
+            assessment = InterviewAssessment.objects.create(
+                user=request.user,
                 selected_skill=selected_skill,
-                transcript=[],
-                response_language=resolve_language(request.user),
+                interview_language=interview_language,
+                is_completed=False,
             )
+            first_question = _next_structured_question(assessment)
+            if not first_question:
+                raise InterviewGenerationError("No structured interview questions are available for this skill.")
         except InterviewGenerationError as exc:
             if 'assessment' in locals():
                 assessment.delete()
@@ -748,8 +985,13 @@ class OnboardingSelectSkillView(generics.GenericAPIView):
             {
                 "assessment_id": assessment.id,
                 "selected_skill": selected_skill,
-                "question": first_turn["question_text"],
-                "is_complete": first_turn["is_complete"],
+                "interview_language": assessment.interview_language,
+                "question": first_question["question_text"],
+                "question_key": first_question["question_key"],
+                "question_type": first_question.get("type", "text"),
+                "options": first_question.get("options", []),
+                "question_object": _serialize_interview_question(first_question),
+                "is_complete": False,
                 "skills": SELECTABLE_SOFT_SKILLS,
             },
             status=status.HTTP_201_CREATED,
@@ -776,7 +1018,16 @@ class OnboardingInterviewView(generics.GenericAPIView):
                 return Response({"detail": "Assessment already completed."}, status=status.HTTP_400_BAD_REQUEST)
 
             question_text = serializer.validated_data["question_text"].strip()
+            question_key = serializer.validated_data.get("question_key", "").strip()
             response_text = serializer.validated_data["response_text"].strip()
+            selected_skill = (
+                assessment.selected_skill
+                or UserSkillProfile.objects.filter(user=request.user).values_list("selected_skill", flat=True).first()
+                or "communication"
+            ).strip().lower()
+            interview_language = _normalize_interview_language(assessment.interview_language)
+            if not question_key:
+                question_key = _question_key_from_text(selected_skill, interview_language, question_text)
             normalized_question = _normalize_question_text(question_text)
             if not normalized_question:
                 return Response({"detail": "Question text is invalid."}, status=status.HTTP_400_BAD_REQUEST)
@@ -787,6 +1038,8 @@ class OnboardingInterviewView(generics.GenericAPIView):
             }
             if normalized_question in existing_questions:
                 return Response({"detail": "This interview question has already been answered."}, status=status.HTTP_400_BAD_REQUEST)
+            if question_key and assessment.responses.filter(question_key=question_key).exists():
+                return Response({"detail": "This interview question has already been answered."}, status=status.HTTP_400_BAD_REQUEST)
 
             next_sequence = (
                 assessment.responses.aggregate(max_sequence=Max("sequence_order")).get("max_sequence") or 0
@@ -794,21 +1047,45 @@ class OnboardingInterviewView(generics.GenericAPIView):
             InterviewResponse.objects.create(
                 assessment=assessment,
                 sequence_order=next_sequence,
+                question_key=question_key,
                 question_text=question_text,
                 response_text=response_text,
             )
 
             transcript = _build_interview_transcript(assessment)
-            selected_skill = (
-                assessment.selected_skill
-                or UserSkillProfile.objects.filter(user=request.user).values_list("selected_skill", flat=True).first()
-                or "communication"
-            ).strip().lower()
-            next_turn = _request_dynamic_interview_turn(
-                selected_skill=selected_skill,
-                transcript=transcript,
-                response_language=resolve_language(request.user, response_text),
-            )
+            next_structured_question = _next_structured_question(assessment)
+            if next_structured_question:
+                next_turn = {
+                    "is_complete": False,
+                    "phase": "structured",
+                    **_serialize_interview_question(next_structured_question),
+                }
+            elif _ai_question_count(assessment) >= MAX_AI_INTERVIEW_QUESTIONS:
+                assessment.is_completed = True
+                assessment.save(update_fields=["is_completed"])
+                next_turn = {
+                    "is_complete": True,
+                    "completion_reason": "Maximum AI follow-up questions completed.",
+                }
+            else:
+                next_turn = _generate_next_interview_question(
+                    selected_skill=selected_skill,
+                    transcript=transcript,
+                    interview_language=interview_language,
+                )
+                if next_turn["is_complete"]:
+                    assessment.is_completed = True
+                    assessment.save(update_fields=["is_completed"])
+                else:
+                    next_turn = {
+                        "phase": "ai",
+                        "question": next_turn["question_text"],
+                        "question_text": next_turn["question_text"],
+                        "question_key": next_turn["question_key"],
+                        "question_type": "text",
+                        "options": [],
+                        **next_turn,
+                    }
         except InterviewGenerationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except APIException:
@@ -827,6 +1104,17 @@ class OnboardingInterviewView(generics.GenericAPIView):
             payload["completion_reason"] = next_turn.get("completion_reason", "")
         else:
             payload["next_question"] = next_turn["question_text"]
+            payload["next_question_key"] = next_turn.get("question_key", "")
+            payload["next_question_type"] = next_turn.get("question_type", "text")
+            payload["options"] = next_turn.get("options", [])
+            payload["phase"] = next_turn.get("phase", "")
+            payload["question_object"] = {
+                "question_key": next_turn.get("question_key", ""),
+                "question": next_turn["question_text"],
+                "question_text": next_turn["question_text"],
+                "question_type": next_turn.get("question_type", "text"),
+                "options": next_turn.get("options", []),
+            }
         return Response(payload, status=status.HTTP_200_OK)
 
 
@@ -865,16 +1153,13 @@ class OnboardingGenerateRoadmapView(generics.GenericAPIView):
             selected_skill = assessment.selected_skill or UserSkillProfile.objects.filter(user=request.user).values_list(
                 "selected_skill", flat=True
             ).first()
-            selected_skill = (selected_skill or "communication").strip().lower()
+            selected_skill = _normalize_selected_skill(selected_skill)
 
             transcript = _build_interview_transcript(assessment)
             payload = _generate_roadmap_payload(
                 selected_skill=selected_skill,
                 transcript=transcript,
-                response_language=resolve_language(
-                    request.user,
-                    " ".join(item["response_text"] for item in transcript),
-                ),
+                response_language=assessment.interview_language,
             )
         except APIException:
             raise

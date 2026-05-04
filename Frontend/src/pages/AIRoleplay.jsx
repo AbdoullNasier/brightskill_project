@@ -204,15 +204,15 @@ const AIRolePlay = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 h-[calc(100vh-64px)] flex flex-col">
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">AI Assistant Coach</h1>
-                <p className="text-gray-600">Your personal guide for career advice and soft skill development.</p>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+            <div className="mb-3 sm:mb-4 shrink-0">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">AI Assistant Coach</h1>
+                <p className="text-sm sm:text-base text-gray-600">Your personal guide for career advice and soft skill development.</p>
             </div>
 
-            <div className="flex-1 min-h-0 flex gap-4">
-                <aside className="w-full md:w-80 md:flex-shrink-0 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                    <div className="p-4 border-b border-gray-100">
+            <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 md:gap-4">
+                <aside className="w-full md:w-80 md:flex-shrink-0 max-h-52 md:max-h-none bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                    <div className="p-3 sm:p-4 border-b border-gray-100 shrink-0">
                         <Button onClick={startNewChat} className="w-full !py-2.5 flex items-center justify-center gap-2">
                             <MdAdd size={18} />
                             New chat
@@ -227,7 +227,7 @@ const AIRolePlay = () => {
                             />
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-2">
+                    <div className="flex-1 min-h-0 overflow-y-auto p-2">
                         {isHistoryLoading && <p className="text-sm text-gray-500 px-3 py-2">Loading chats...</p>}
                         {!isHistoryLoading && sessions.length === 0 && (
                             <p className="text-sm text-gray-500 px-3 py-2">No chats found.</p>
@@ -287,12 +287,12 @@ const AIRolePlay = () => {
                 <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                     <div
                         ref={chatContainerRef}
-                        className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50 scroll-smooth"
+                        className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 bg-gray-50 scroll-smooth"
                     >
                         {messages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div
-                                    className={`flex max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-3`}
+                                    className={`flex max-w-[92%] sm:max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-2 sm:space-x-3`}
                                 >
                                     <div
                                         className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
@@ -329,10 +329,10 @@ const AIRolePlay = () => {
                         )}
                     </div>
 
-                    <div className="p-4 bg-white border-t border-gray-100">
+                    <div className="p-3 sm:p-4 bg-white border-t border-gray-100 shrink-0">
                         {historyError && <p className="text-sm text-red-600 mb-2">{historyError}</p>}
                         <div className="flex items-end space-x-2">
-                            <button className="p-2 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors">
+                            <button className="hidden sm:block p-2 text-gray-400 hover:text-primary rounded-full hover:bg-gray-100 transition-colors">
                                 <MdMic size={24} />
                             </button>
                             <textarea

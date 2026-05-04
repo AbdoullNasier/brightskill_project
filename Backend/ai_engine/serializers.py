@@ -149,6 +149,7 @@ class InterviewStartSerializer(serializers.Serializer):
 class InterviewAnswerSerializer(serializers.Serializer):
     assessment_id = serializers.IntegerField()
     question_text = serializers.CharField()
+    question_key = serializers.CharField(required=False, allow_blank=True)
     response_text = serializers.CharField(allow_blank=False)
 
     def validate_question_text(self, value):
