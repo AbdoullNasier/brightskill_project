@@ -1220,6 +1220,9 @@ class OnboardingGenerateRoadmapView(generics.GenericAPIView):
                 topic=selected_skill,
                 source_type="conversation",
                 source_id=assessment.id,
+                context_text=json.dumps(transcript, ensure_ascii=False),
+                focus_areas=[selected_skill],
+                response_language=assessment.interview_language,
             )
         except Exception:
             pass

@@ -1,5 +1,6 @@
 from decimal import Decimal
 import logging
+import json
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from courses.models import Course, Module
@@ -53,6 +54,46 @@ def _has_passed_course_exam(user, course: Course) -> bool:
     return any(attempt.score >= attempt.quiz.pass_score for attempt in attempts)
 
 
+def _json_number(value):
+    if value is None:
+        return None
+    return float(value)
+
+
+def _build_course_recommendation_context(user, course: Course, quiz: Quiz | None = None, attempt: QuizAttempt | None = None) -> str:
+    completed_modules = list(
+        ModuleCompletion.objects.filter(user=user, module__course=course)
+        .select_related("module")
+        .order_by("module__order_index")
+        .values_list("module__title", flat=True)
+    )
+    recent_attempts = list(
+        QuizAttempt.objects.filter(user=user, quiz__course=course)
+        .select_related("quiz")
+        .order_by("-attempt_date")[:5]
+    )
+    payload = {
+        "course_title": course.title,
+        "course_description": course.description,
+        "selected_skill": getattr(course.skill, "name", "") or "",
+        "completed_modules": completed_modules,
+        "current_quiz": quiz.title if quiz else "",
+        "current_quiz_type": quiz.quiz_type if quiz else "",
+        "current_score": _json_number(attempt.score) if attempt else None,
+        "passing_score": _json_number(quiz.pass_score) if quiz else None,
+        "recent_quiz_attempts": [
+            {
+                "quiz_title": item.quiz.title,
+                "quiz_type": item.quiz.quiz_type,
+                "score": _json_number(item.score),
+                "pass_score": _json_number(item.quiz.pass_score),
+            }
+            for item in recent_attempts
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
 @transaction.atomic
 def enroll_user_in_course(user, course_id: int):
     course = Course.objects.get(id=course_id)
@@ -98,6 +139,8 @@ def mark_module_complete(user, course_id: int | None, module_id: int):
                 topic=getattr(course.skill, "name", "") or course.title or "soft skills",
                 source_type="course",
                 source_id=course.id,
+                context_text=_build_course_recommendation_context(user, course),
+                focus_areas=[getattr(course.skill, "name", "") or course.title],
             )
         except Exception:
             logger.exception("Book recommendation failed for user=%s course=%s", user.id, course.id)
@@ -123,6 +166,8 @@ def handle_quiz_submission(user, quiz: Quiz, attempt: QuizAttempt):
                 topic=getattr(course.skill, "name", "") or course.title or "soft skills",
                 source_type="course",
                 source_id=course.id,
+                context_text=_build_course_recommendation_context(user, course, quiz=quiz, attempt=attempt),
+                focus_areas=[getattr(course.skill, "name", "") or course.title],
             )
         except Exception:
             logger.exception("Book recommendation failed for user=%s course=%s", user.id, course.id)

@@ -1,58 +1,53 @@
 import json
-from .models import BookRecommendation
+import re
+
 from ai_engine.catalog import SUPPORTED_PLATFORM_SKILLS, normalize_focus_area, normalize_focus_areas
+from ai_engine.services import ask_gemini
+from .models import BookRecommendation
 
 
-CURATED_BOOKS = {
-    "Communication": {
-        "title": "Crucial Conversations",
-        "author": "Kerry Patterson, Joseph Grenny, Ron McMillan, and Al Switzler",
-    },
-    "Leadership": {
-        "title": "Leaders Eat Last",
-        "author": "Simon Sinek",
-    },
-    "Emotional Intelligence": {
-        "title": "Emotional Intelligence 2.0",
-        "author": "Travis Bradberry and Jean Greaves",
-    },
-    "Critical Thinking": {
-        "title": "Thinking, Fast and Slow",
-        "author": "Daniel Kahneman",
-    },
-    "Time Management": {
-        "title": "Deep Work",
-        "author": "Cal Newport",
-    },
-    "Adaptability": {
-        "title": "Who Moved My Cheese?",
-        "author": "Spencer Johnson",
-    },
-}
+AI_SERVICE_ERROR_MARKERS = (
+    "AI usage limit reached",
+    "I could not reach the AI service",
+    "AI service authentication failed",
+    "AI model configuration error",
+    "AI service not configured",
+    "AI service is not authorized",
+    "The AI is busy right now",
+    "I'm having trouble reaching the AI right now",
+    "having trouble reaching the AI",
+)
 
 
-def parse_book_payload(raw_text):
-    # Prefer structured json but allow plain fallback from model output.
+def _is_ai_service_error(text):
+    clean = str(text or "").strip().lower()
+    return any(marker.lower() in clean for marker in AI_SERVICE_ERROR_MARKERS)
+
+
+def _compact_text(value, max_length=1800):
+    clean = re.sub(r"\s+", " ", str(value or "")).strip()
+    return clean[:max_length].rstrip()
+
+
+def _extract_json_payload(raw_text):
+    text = str(raw_text or "").strip()
+    if not text:
+        return {}
     try:
-        parsed = json.loads(raw_text)
-        return {
-            "title": parsed.get("title", "The 7 Habits of Highly Effective People"),
-            "author": parsed.get("author", "Stephen R. Covey"),
-            "reason": parsed.get("reason", "Practical habits for communication and leadership growth."),
-        }
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else {}
     except Exception:
-        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-        title = "The 7 Habits of Highly Effective People"
-        author = "Stephen R. Covey"
-        reason = "Practical habits for communication and leadership growth."
-        for line in lines:
-            if line.lower().startswith("title:"):
-                title = line.split(":", 1)[1].strip()
-            elif line.lower().startswith("author:"):
-                author = line.split(":", 1)[1].strip()
-            elif line.lower().startswith("reason:"):
-                reason = line.split(":", 1)[1].strip()
-        return {"title": title, "author": author, "reason": reason}
+        pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            parsed = json.loads(text[start : end + 1])
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
 
 
 def _infer_skill_from_context(topic="", context_text="", focus_areas=None):
@@ -75,34 +70,68 @@ def _infer_skill_from_context(topic="", context_text="", focus_areas=None):
     return "Communication"
 
 
-def _build_contextual_reason(skill, topic="", context_text="", response_language="en"):
-    topic_text = str(topic or "").strip()
-    context_preview = str(context_text or "").strip()[:180]
-    if response_language == "ha":
-        reasons = {
-            "Communication": "An zaɓi wannan littafi ne domin zai taimaka maka ko miki wajen inganta bayyana ra'ayi, sauraro, da sadarwa mai tasiri a yanayin aikinki.",
-            "Leadership": "An zaɓi wannan littafi ne domin yana taimaka wa mai koyo ya gina jagoranci, tasiri, da kyakkyawar hulɗa da ƙungiya.",
-            "Emotional Intelligence": "An zaɓi wannan littafi ne domin yana taimakawa wajen fahimtar ji, sarrafa halayya, da kyautata hulɗa da mutane.",
-            "Critical Thinking": "An zaɓi wannan littafi ne domin yana taimakawa wajen nazari, yanke shawara, da warware matsaloli cikin tsari.",
-            "Time Management": "An zaɓi wannan littafi ne domin yana taimaka maka ko miki wajen tsara lokaci, fifita aiki, da mayar da hankali.",
-            "Adaptability": "An zaɓi wannan littafi ne domin yana koyar da yadda ake sabawa da sauyi da aiki da kyau a yanayi mai canzawa.",
-        }
-        return reasons.get(skill, "An zaɓi wannan littafi ne domin ya dace da manufar bunkasa soft skills dinki.")
+def _build_book_prompt(skill, topic="", context_text="", source_type="", response_language="en"):
+    language_name = "Hausa" if response_language == "ha" else "English"
+    return (
+        "You are an expert learning coach and librarian for BrightSkill.\n"
+        "Recommend exactly ONE real, well-known, high-quality book for this learner.\n"
+        "The recommendation must be personalized from the learner context, not a fixed default.\n"
+        "Return JSON only with this exact schema:\n"
+        "{"
+        '"title":"...",'
+        '"author":"...",'
+        '"reason":"..."'
+        "}\n"
+        "Rules:\n"
+        "- Recommend a real published book, not a course, article, podcast, or imaginary title.\n"
+        "- Choose the book that best fits the learner's current soft-skill need, challenge, confidence, and goal.\n"
+        "- Stay focused on the selected skill and BrightSkill learning context.\n"
+        "- The reason must explain why this specific book fits this specific learner.\n"
+        "- Keep the reason practical and concise, 2 to 4 sentences.\n"
+        f"- Write the reason in {language_name}. Keep the book title and author in their official names.\n\n"
+        f"Selected skill: {skill}\n"
+        f"Topic/source topic: {_compact_text(topic, 300)}\n"
+        f"Source type: {source_type}\n"
+        f"Learner context: {_compact_text(context_text)}"
+    )
 
-    reasons = {
-        "Communication": "Recommended because it directly supports clearer communication, stronger listening, and better high-stakes conversations.",
-        "Leadership": "Recommended because it fits your need to build influence, team trust, and practical leadership habits.",
-        "Emotional Intelligence": "Recommended because it supports self-awareness, emotional control, and stronger interpersonal relationships.",
-        "Critical Thinking": "Recommended because it helps strengthen analysis, judgment, and structured problem solving.",
-        "Time Management": "Recommended because it supports focus, prioritization, and more disciplined use of time.",
-        "Adaptability": "Recommended because it helps you respond better to change, uncertainty, and shifting work demands.",
+
+def _generate_ai_book_payload(
+    *,
+    skill,
+    topic="",
+    source_type="",
+    context_text="",
+    response_language="en",
+):
+    prompt = _build_book_prompt(
+        skill=skill,
+        topic=topic,
+        context_text=context_text,
+        source_type=source_type,
+        response_language=response_language,
+    )
+    raw = ask_gemini(
+        prompt,
+        max_output_tokens=420,
+        temperature=0.35,
+        response_language=response_language,
+    )
+    if _is_ai_service_error(raw):
+        raise RuntimeError(str(raw))
+
+    payload = _extract_json_payload(raw)
+    title = str(payload.get("title", "")).strip()
+    author = str(payload.get("author", "")).strip()
+    reason = str(payload.get("reason", "")).strip()
+    if not title or not author or not reason:
+        raise ValueError("AI returned an invalid book recommendation payload.")
+
+    return {
+        "title": title[:255],
+        "author": author[:255],
+        "reason": reason,
     }
-    reason = reasons.get(skill, "Recommended because it fits your current soft-skills growth goal.")
-    if topic_text:
-        reason = f"{reason} It matches your current focus on {topic_text.lower()}."
-    elif context_preview:
-        reason = f"{reason} It aligns with the needs described in your interview."
-    return reason
 
 
 def create_book_recommendation(
@@ -115,18 +144,14 @@ def create_book_recommendation(
     response_language="en",
 ):
     skill = _infer_skill_from_context(topic=topic, context_text=context_text, focus_areas=focus_areas)
-    selected = CURATED_BOOKS.get(skill, CURATED_BOOKS["Communication"])
-    parsed = {
-        "title": selected["title"],
-        "author": selected["author"],
-        "reason": _build_contextual_reason(
-            skill,
-            topic=topic,
-            context_text=context_text,
-            response_language=response_language,
-        ),
-    }
-    recommendation = BookRecommendation.objects.create(
+    parsed = _generate_ai_book_payload(
+        skill=skill,
+        topic=topic,
+        source_type=source_type,
+        context_text=context_text,
+        response_language=response_language,
+    )
+    return BookRecommendation.objects.create(
         user=user,
         source_type=source_type,
         source_id=source_id,
@@ -134,4 +159,3 @@ def create_book_recommendation(
         author=parsed["author"],
         reason=parsed["reason"],
     )
-    return recommendation
